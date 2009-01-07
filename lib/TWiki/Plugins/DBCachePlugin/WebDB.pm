@@ -156,7 +156,7 @@ sub onReload {
         my $name = $pref->fastget('name');
         if ($name eq 'TOPICTITLE') {
           $topicTitle = $pref->fastget('value');
-          $topicTitle = TWiki::urlDecode($topicTitle);
+          $topicTitle = urlDecode($topicTitle);
           last;
         }
       }
@@ -178,7 +178,7 @@ sub onReload {
         #print STDERR "trying form\n";
         $form = $topic->fastget($form);
         $topicTitle = $form->fastget('TopicTitle') || '';
-        $topicTitle = TWiki::urlDecode($topicTitle);
+        $topicTitle = urlDecode($topicTitle);
       }
     }
 
@@ -233,7 +233,7 @@ sub getFormField {
 
   $form = $topicObj->fastget($form);
   my $formfield = $form->fastget($theFormField) || '';
-  return TWiki::urlDecode($formfield);
+  return urlDecode($formfield);
 }
 
 ###############################################################################
@@ -368,13 +368,10 @@ sub expandPath {
   #print STDERR "DEBUG: expandPath($theRoot, $thePath)\n";
 
   if ($thePath =~ /^info.author$/) {
-    if (defined(&TWiki::Users::getWikiName)) {    # TWiki-4.2 onwards
-      my $info = $theRoot->fastget('info');
-      return '' unless $info;
-      my $author = $info->fastget('author');
-      my $session = $TWiki::Plugins::SESSION;
-      return $session->{users}->getWikiName($author);
-    }
+    my $info = $theRoot->fastget('info');
+    return '' unless $info;
+    my $author = $info->fastget('author');
+    return TWiki::Func::getWikiName($author);
   }
   if ($thePath =~ /^(.*?) and (.*)$/) {
     my $first = $1;
@@ -409,7 +406,7 @@ sub expandPath {
     return $this->expandPath($root, $tail) if ref($root);
     return '' unless $root;
     return $root if $first eq 'text'; # not url encoded
-    my $field = TWiki::urlDecode($root);
+    my $field = urlDecode($root);
 
     #print STDERR "DEBUG: result=$field\n";
     return $field;
@@ -447,4 +444,13 @@ sub expandPath {
 }
 
 ###############################################################################
+# from TWiki.pm
+sub urlDecode {
+    my $text = shift;
+
+    $text =~ s/%([\da-f]{2})/chr(hex($1))/gei;
+
+    return $text;
+}
+
 1;

@@ -17,8 +17,8 @@ package TWiki::Plugins::DBCachePlugin::Core;
 use strict;
 use vars qw( 
   $TranslationToken %webDB %webDBIsModified $wikiWordRegex $webNameRegex
-  $defaultWebNameRegex $linkProtocolPattern $twikiWeb
-  $baseWeb $baseTopic %MON2NUM
+  $defaultWebNameRegex $linkProtocolPattern $tagNameRegex
+  $twikiWeb $baseWeb $baseTopic %MON2NUM $dbQueryCurrentWeb
 );
 
 %MON2NUM = (
@@ -59,10 +59,17 @@ sub init {
   %webDBIsModified = ();
 
   my $query = TWiki::Func::getCgiQuery();
-  my $doRefresh = $query->param('refresh') || '';
-  if ($doRefresh eq 'on') {
+  my $memoryCache = $TWiki::cfg{DBCache}{MemoryCache};
+  $memoryCache = 1 unless defined $memoryCache;
+
+  if (!$memoryCache) {
     %webDB = ();
-    #writeDebug("found refresh=on in urlparam");
+  } else {
+    my $doRefresh = $query->param('refresh') || '';
+    if ($doRefresh eq 'on') {
+      %webDB = ();
+      #writeDebug("found refresh=on in urlparam");
+    }
   }
 
   $wikiWordRegex = 
@@ -73,6 +80,8 @@ sub init {
     TWiki::Func::getRegularExpression('defaultWebNameRegex');
   $linkProtocolPattern = 
     TWiki::Func::getRegularExpression('linkProtocolPattern');
+  $tagNameRegex = 
+    TWiki::Func::getRegularExpression('tagNameRegex');
   $twikiWeb = TWiki::Func::getTwikiWebname();
 }
 
@@ -80,14 +89,15 @@ sub init {
 sub renderWikiWordHandler {
   my ($theLinkText, $hasExplicitLinkLabel, $theWeb, $theTopic) = @_;
 
+  #writeDebug("called renderWikiWordHandler($theLinkText, ($hasExplicitLinkLabel)?1:0, $theWeb, $theTopic)");
+
   return undef if !defined($theWeb) and !defined($theTopic); 
     # does not work out for TWikis < 4.2
 
-  $theWeb = TWiki::Sandbox::untaintUnchecked($theWeb);# woops why is theWeb tainted
-  return if $hasExplicitLinkLabel;
-  
-  #writeDebug("called renderWikiWordHandler($theLinkText, $theWeb, $theTopic)");
+  return if $hasExplicitLinkLabel && $theLinkText ne $theTopic;
 
+
+  $theWeb = TWiki::Sandbox::untaintUnchecked($theWeb);# woops why is theWeb tainted
   my $topicTitle = getTopicTitle($theWeb, $theTopic);
   #writeDebug("topicTitle=$topicTitle");
 
@@ -119,6 +129,9 @@ sub handleTOPICTITLE {
   my $thisWeb = $params->{web} || $baseWeb;
   my $theEncoding = $params->{encode} || '';
   my $theDefault = $params->{default};
+
+  $thisTopic =~ s/^\s+//go;
+  $thisTopic =~ s/\s+$//go;
 
   my $topicTitle = getTopicTitle($thisWeb, $thisTopic);
 
@@ -199,6 +212,8 @@ sub handleDBQUERY {
   }
   my $theDB = getDB($thisWeb);
 
+  # flag the current web we evaluate this query in, used by web-specific operators
+  $dbQueryCurrentWeb = $thisWeb;
 
   my ($topicNames, $hits, $msg) = $theDB->dbQuery($theSearch, 
     \@topicNames, $theSort, $theReverse, $theInclude, $theExclude);
@@ -275,39 +290,39 @@ sub handleDBQUERY {
 sub findTopicMethod {
   my ($session, $theWeb, $theTopic, $theObject) = @_;
 
-  writeDebug("called findTopicMethod($theWeb, $theTopic, $theObject)");
+  #writeDebug("called findTopicMethod($theWeb, $theTopic, $theObject)");
 
   return undef unless $theObject;
 
   my ($thisWeb, $thisObject) = &TWiki::Func::normalizeWebTopicName($theWeb, $theObject);
 
-  writeDebug("object web=$thisWeb, topic=$thisObject");
+  #writeDebug("object web=$thisWeb, topic=$thisObject");
 
   # get form object
   my $baseDB = getDB($thisWeb);
 
-  writeDebug("1");
+  #writeDebug("1");
 
   my $topicObj = $baseDB->fastget($thisObject);
   return undef unless $topicObj;
 
-  writeDebug("2");
+  #writeDebug("2");
 
   my $form = $topicObj->fastget('form');
   return undef unless $form;
 
-  writeDebug("3");
+  #writeDebug("3");
 
   my $formObj = $topicObj->fastget($form);
   return undef unless $formObj;
 
-  writeDebug("4");
+  #writeDebug("4");
 
   # get type information on this object
   my $topicTypes = $formObj->fastget('TopicType');
   return undef unless $topicTypes;
 
-  writeDebug("topicTypes=$topicTypes");
+  #writeDebug("topicTypes=$topicTypes");
 
   foreach my $topicType (split(/\s*,\s*/, $topicTypes)) {
     $topicType =~ s/^\s+//o;
@@ -344,7 +359,7 @@ sub findTopicMethod {
 
     my $theMethod = $topicType.$theTopic;
     my $targetDB = getDB($targetWeb);
-    writeDebug("checking $targetWeb.$theMethod");
+    #writeDebug("checking $targetWeb.$theMethod");
     return ($targetWeb, $theMethod) if $targetDB->fastget($theMethod);
 
     #writeDebug("6");
@@ -421,6 +436,19 @@ sub handleDBCALL {
     }
   }
 
+  my %saveTags  = %{$session->{SESSION_TAGS}};
+  # copy params into session tags
+  foreach my $key (keys %$params) {
+    my $val = $params->{$key};
+    # SMELL: working around issue in the TWiki/Foswiki parse 
+    # where an undefined %VAR% in SESSION_TAGS is expanded to VAR instead of
+    # leaving it to %VAR%
+    unless ($val =~ /^\%$tagNameRegex\%$/) { 
+      $session->{SESSION_TAGS}{$key} = $val;
+    }
+  }
+  
+
   # check access rights
   my $wikiName = TWiki::Func::getWikiName();
   unless (TWiki::Func::checkAccessPermission('VIEW', $wikiName, undef, $thisTopic, $thisWeb)) {
@@ -470,6 +498,8 @@ sub handleDBCALL {
 
   # cleanup
   delete $session->{dbcalls}->{$key};
+
+  %{$session->{SESSION_TAGS}} = %saveTags;
 
   return $sectionText;
   #return "<verbatim>\n$sectionText\n</verbatim>";
@@ -747,9 +777,9 @@ sub handleATTACHMENTS {
   $theAutoAttached = 1 if $theAutoAttached =~ /^(yes|on)$/o;
   $theAutoAttached = 2 if $theAutoAttached eq 'undef';
   my $theMinDate = $params->{mindate};
-  $theMinDate = TWiki::Time::parseTime($theMinDate) if $theMinDate;
+  $theMinDate = parseTime($theMinDate) if $theMinDate;
   my $theMaxDate = $params->{maxdate};
-  $theMaxDate = TWiki::Time::parseTime($theMaxDate) if $theMaxDate;
+  $theMaxDate = parseTime($theMaxDate) if $theMaxDate;
   my $theMinSize = $params->{minsize} || 0;
   my $theMaxSize = $params->{maxsize} || 0;
   my $theUser = $params->{user} || '.*';
@@ -1089,16 +1119,16 @@ sub getDB {
   unless (defined $webDB{$theWeb}) {
     # never loaded
     $isModified = 1;
-    writeDebug("fresh reload of '$theWeb' ($isModified)");
+    writeDebug("fresh reload of '$theWeb'");
   } else {
     unless (defined $webDBIsModified{$theWeb}) {
       # never checked
       $webDBIsModified{$theWeb} = $webDB{$theWeb}->isModified();
       if (DEBUG) {
         if ($webDBIsModified{$theWeb}) {
-          writeDebug("reloading modified $theWeb");
+          #writeDebug("reloading modified $theWeb");
         } else {
-          writeDebug("don't need to load webdb for $theWeb");
+          #writeDebug("don't need to load webdb for $theWeb");
         }
       }
     }
@@ -1116,6 +1146,14 @@ sub getDB {
     $webDB{$theWeb} = new $impl($theWeb);
     $webDB{$theWeb}->load();
     $webDBIsModified{$theWeb} = 0;
+  }
+
+  if (DEBUG) {
+    #require Data::Dumper;
+    #my $db = $webDB{$theWeb};
+    #print STDERR "=====================\n";
+    #print STDERR Data::Dumper->Dump([$db], [ref $db]);
+    #print STDERR "=====================\n";
   }
 
   return $webDB{$theWeb};

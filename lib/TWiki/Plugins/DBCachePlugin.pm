@@ -27,7 +27,7 @@ use vars qw(
 );
 
 $VERSION = '$Rev$';
-$RELEASE = '2.02';
+$RELEASE = '2.12';
 $NO_PREFS_IN_TOPIC = 1;
 $SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 
@@ -37,9 +37,9 @@ sub initPlugin {
   ($baseTopic, $baseWeb) = @_;
 
   # check for Plugins.pm versions
-  if ($TWiki::Plugins::VERSION < 1.1) {
-    return 0;
-  }
+#  if ($TWiki::Plugins::VERSION < 1.1) {
+#    return 0;
+#  }
   
   TWiki::Func::registerTagHandler('DBQUERY', \&DBQUERY);
   TWiki::Func::registerTagHandler('DBCALL', \&DBCALL);
@@ -53,7 +53,8 @@ sub initPlugin {
   TWiki::Func::registerRESTHandler('UpdateCache', \&updateCache );
 
   # SMELL: remove this when TWiki::Cache got into the core
-  if (defined $TWiki::Plugins::SESSION->{cache}) {
+  my $cache = $TWiki::Plugins::SESSION->{cache} || $Foswiki::Plugins::SESSION->{cache};
+  if (defined $cache) {
     $addDependency = \&addDependencyHandler;
   } else {
     $addDependency = \&nullHandler;
@@ -144,7 +145,8 @@ sub getTopicTitle {
 # SMELL: remove this when TWiki::Cache got into the core
 sub nullHandler { }
 sub addDependencyHandler {
-  return $TWiki::Plugins::SESSION->{cache}->addDependency(@_);
+  my $cache = $TWiki::Plugins::SESSION->{cache} || $Foswiki::Plugins::SESSION->{cache};
+  return $cache->addDependency(@_);
 }
 
 ###############################################################################
