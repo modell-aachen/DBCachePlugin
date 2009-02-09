@@ -1,4 +1,4 @@
-%META:TOPICINFO{author="ProjectContributor" date="1222236379" format="1.1" reprev="1.3" version="$Rev$"}%
+%META:TOPICINFO{author="ProjectContributor" date="1222236379" format="1.1" reprev="1.3" version="1"}%
 <!--
 
    PLEASE DO NOT EDIT THIS TOPIC
@@ -96,7 +96,9 @@ limit the number of attachments to be listed.
 | =separator="..."= | format string put between each formatted attachment  |
 | =hidenull="on,off"= | hide/display the empty result; only the header and the footer are included \
                 of set to "off" and there's no attachment at the given topic |
-| =sort="name,date,size,user"= | sortion of result |
+| =sort="name,date,size,user,comment,commet:name"= | sortion of result |
+| =reverse="on/off"= | enable reverse sorting |
+| =limit="..."= | limit the number of attachments to the given number; by default show all |
 
 The following variables can be used in the format parameter:
    * $attr: the attributes
@@ -279,8 +281,8 @@ All format strings may contain the following variables:
 
 Example:
 
-%<nop>DBRECURSE{"FrequentlyAskedQuestions"}% lists all FrequentlyAskedQuestions topics (with properly set topic parent)
-%DBRECURSE{"FrequentlyAskedQuestions"}%
+%<nop>DBRECURSE{"%SYSTEMWEB%.FrequentlyAskedQuestions"}% lists all %SYSTEMWEB%.FrequentlyAskedQuestions topics (with properly set topic parent)
+%DBRECURSE{"%SYSTEMWEB%.FrequentlyAskedQuestions"}%
 
 
 ---+++ DBSTATS
@@ -354,28 +356,7 @@ derive the title of a topic from a couple of properties:
 ---++ Syntax of search queries
 A search query is a boolean expression on fields of a topic. (Tip: use %DBDUMP to explore the available fields).
 
-Fields are given by name, and values by strings or numbers. Strings should always be surrounded by 'single-quotes'. Strings which are regular expressions (RHS of =, != =~ operators) use 'perl' regular expression syntax (google for =perlre= for help). Numbers can be signed integers or decimals. Single quotes in values may be escaped using backslash (\).
-
-The following operators are available:
-| *Operator* | *Result* | *Meaning* |
-| <code>=</code> | Boolean | LHS exactly matches the regular expression on the RHS. The expression must match the whole string. |
-| <code>!=</code> | Boolean | Inverse of = |
-| <code>=~</code> | Boolean | LHS contains RHS i.e. the RHS is found somewhere in the field value. |
-| <code>&lt;</code> | Boolean | Numeric < |
-| <code>&gt;</code> | Boolean | Numeric > |
-| <code>&gt;=</code> | Boolean | Numeric >= |
-| <code>&lt;=</code> | Boolean | Numeric <= |
-| =lc= | String | Unary lower case |
-| =uc= | String | Unary UPPER CASE |
-| =EARLIER_THAN= | BOOLEAN | Date is earlier than the given date |
-| =LATER_THAN= | Boolean | LHS is later than the given date (string containing a date e.g. '1 Apr 2003') |
-| =WITHIN_DAYS= | Boolean | Date (which must be in the future) is within n _working_ days of todays date |
-| <code>!</code> | Boolean | Unary NOT |
-| =AND= | Boolean | AND |
-| =OR= | Boolean | OR |
-| <code>()</code> | any | Bracketed subexpression |
-
-Dates for =EARLIER_THAN=, =LATER_THAN= and =WITHIN_DAYS= must be dates in the format expected by =Time::ParseDate= (like the ActionTrackerPlugin). =WITHIN_DAYS= works out the number of _working_ days (i.e. excluding Saturday and Sunday). Apologies in advance if your weekend is offset &plusmn; a day! Integers will automatically be converted to dates, by assuming they represent a number of seconds since midnight GMT on 1st January 1970.
+%INCLUDE{"DBCacheContrib" section="searchoperators"}%
 
 ---+++ Examples
    * Find all topics that have been last modified before 1st January 2008
@@ -474,11 +455,21 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 %$MANIFEST%
 
 ---++ Plugin Info
+%RED%
+Warning: This version of <nop>DBCachePlugin is incompatible with the current version
+of Foswiki:Extensions/DBCacheContrib. As long as this is the case, <nop>DBCachePlugin comes
+bundled with an own internal version of DBCacheContrib. This is an interim step only. 
+It will be removed as soon as <nop>DBCachePlugin has been updated. This warning is only
+relevant to people contributing to these two extensions.
+%ENDCOLOR%
+
 |  Plugin Author: | Michael Daum |
-|  Copyright &copy;: | 2005-2008, Michael Daum http://michaeldaumconsulting.com |
+|  Copyright &copy;: | 2005-2009, Michael Daum http://michaeldaumconsulting.com |
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
-|  Plugin Version: | v2.12 |
+|  Plugin Version: | v2.20 |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  09 Jan 2009: | internalized compatible version of DBCacheContrib; \
+                  added limit to ATTACHMENTS and a few more ways to sort them |
 |  07 Jan 2009: | new global variable =dbQueryCurrentWeb= being set during a DBQUERY so that \
                   external predicates that depend on the web information can make use of it; \
                   renderWikiWord also displays topic titles for explicit links where the link text \
@@ -554,11 +545,8 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 |  26 Jan 2006: | fixed internal links in DBCALL; \
                   support for STARTSECTION, old SECTION being deprecated |
 |  24 Nov 2005: | Initial version |
-|  Dependency: | $Foswiki::Plugins::VERSION 1.1 |
-|  CPAN Dependencies: | none |
-|  Other Dependencies: | Foswiki:Extensions/DBCacheContrib |
+|  Dependencies: | %$DEPENDENCIES% |
 |  Perl Version: | 5.8 |
-|  [[Foswiki:Extensions/Benchmark][Benchmarks]]: | %SYSTEMWEB%.GoodStyle nn%, %SYSTEMWEB%.FormattedSearch nn%, %TOPIC% nn% |
 |  Plugin Home: | http://foswiki.org/Extensions/%TOPIC% |
 
 %META:FILEATTACHMENT{name="wikiringlogo40x40.png" attr="h" autoattached="1" comment="" date="1207666446" path="wikiringlogo40x40.png" size="2571" user="ProjectContributor" version="1"}%

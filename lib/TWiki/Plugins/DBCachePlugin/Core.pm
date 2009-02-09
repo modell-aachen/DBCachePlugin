@@ -1,6 +1,6 @@
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright (C) 2005-2008 Michael Daum http://michaeldaumconsulting.com
+# Copyright (C) 2005-2009 Michael Daum http://michaeldaumconsulting.com
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -89,13 +89,13 @@ sub init {
 sub renderWikiWordHandler {
   my ($theLinkText, $hasExplicitLinkLabel, $theWeb, $theTopic) = @_;
 
-  #writeDebug("called renderWikiWordHandler($theLinkText, ($hasExplicitLinkLabel)?1:0, $theWeb, $theTopic)");
+  #writeDebug("called renderWikiWordHandler($theLinkText, ".($hasExplicitLinkLabel?'1':'0').", $theWeb, $theTopic)");
 
   return undef if !defined($theWeb) and !defined($theTopic); 
     # does not work out for TWikis < 4.2
 
   return if $hasExplicitLinkLabel && $theLinkText ne $theTopic;
-
+  return if $theLinkText eq "$theWeb.$theTopic";
 
   $theWeb = TWiki::Sandbox::untaintUnchecked($theWeb);# woops why is theWeb tainted
   my $topicTitle = getTopicTitle($theWeb, $theTopic);
@@ -788,8 +788,13 @@ sub handleATTACHMENTS {
   my $theFormat = $params->{format};
   my $theSeparator = $params->{separator};
   my $theSort = $params->{sort} || $params->{order} || 'name';
+  my $theReverse = $params->{reverse} || 'off';
   my $theHideNull = $params->{hidenull} || 'off';
   my $theComment = $params->{comment} || '.*';
+  my $theLimit = $params->{limit} || 0;
+
+  $theLimit =~ s/[^\d]//go;
+  $theLimit = 0 unless $theLimit;
 
   $theFormat = '| [[$url][$name]] |  $sizeK | <nobr>$date</nobr> | $wikiuser | $comment |' 
     unless defined $theFormat;
@@ -805,22 +810,31 @@ sub handleATTACHMENTS {
   my $attachments = $topicObj->fastget('attachments');
   return '' unless $attachments;
 
-  my @attachments;
+  my @attachments = $attachments->getValues();
   if ($theSort eq 'name') {
-    @attachments = sort {$a->fastget('name') cmp $b->fastget('name')} 
-      $attachments->getValues();
+    @attachments = sort {lc($a->fastget('name')) cmp lc($b->fastget('name'))} 
+      @attachments;
   } elsif ($theSort eq 'date') {
     @attachments = sort {$a->fastget('date') <=> $b->fastget('date')} 
-      $attachments->getValues();
+      @attachments;
   } elsif ($theSort eq 'size') {
     @attachments = sort {$a->fastget('size') <=> $b->fastget('size')} 
-      $attachments->getValues();
+      @attachments;
   } elsif ($theSort eq 'user') {
     @attachments = sort {$a->fastget('user') cmp $b->fastget('user')} 
-      $attachments->getValues();
+      @attachments;
+  } elsif ($theSort eq 'comment') {
+    @attachments = sort {
+      lc($a->fastget('comment')) cmp lc($b->fastget('comment'))
+    } @attachments;
+  } elsif ($theSort eq 'comment:name') {
+    @attachments = sort {
+      lc($a->fastget('comment') || $a->fastget('name')) 
+        cmp 
+      lc($b->fastget('comment') || $a->fastget('name'))
+    } @attachments;
   }
-
-  #writeDebug("theComment=$theComment");
+  @attachments = reverse @attachments if $theReverse eq 'on';
 
   # collect result
   my @result;
@@ -853,7 +867,7 @@ sub handleATTACHMENTS {
     next unless $user =~ /^($theUser)$/;
     my ($userWeb, $userTopic) = TWiki::Func::normalizeWebTopicName('', $user);
 
-    my $size = $attachment->fastget('size');
+    my $size = $attachment->fastget('size') || 0;
     #writeDebug("size=$size");
     next if $theMinSize && $size < $theMinSize;
     next if $theMaxSize && $size > $theMaxSize;
@@ -935,6 +949,7 @@ sub handleATTACHMENTS {
     );
 
     push @result, $text;
+    last if $theLimit && $index >= $theLimit;
   }
 
   return '' if $theHideNull eq 'on' && $index == 0;
