@@ -26,128 +26,127 @@ use vars qw(
   $addDependency
 );
 
-$VERSION           = '$Rev$';
-$RELEASE           = '2.12';
+$VERSION = '$Rev$';
+$RELEASE = '3.00';
 $NO_PREFS_IN_TOPIC = 1;
-$SHORTDESCRIPTION  = 'Lightweighted frontend to the DBCacheContrib';
+$SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 
 ###############################################################################
 # plugin initializer
 sub initPlugin {
-    ( $baseTopic, $baseWeb ) = @_;
+  ($baseTopic, $baseWeb) = @_;
 
-    # check for Plugins.pm versions
-    #  if ($Foswiki::Plugins::VERSION < 1.1) {
-    #    return 0;
-    #  }
+  # check for Plugins.pm versions
+  #  if ($Foswiki::Plugins::VERSION < 1.1) {
+  #    return 0;
+  #  }
 
-    Foswiki::Func::registerTagHandler( 'DBQUERY', \&DBQUERY );
-    Foswiki::Func::registerTagHandler( 'DBCALL',  \&DBCALL );
-    Foswiki::Func::registerTagHandler( 'DBSTATS', \&DBSTATS );
-    Foswiki::Func::registerTagHandler( 'DBDUMP',  \&DBDUMP );    # for debugging
-    Foswiki::Func::registerTagHandler( 'DBRECURSE',     \&DBRECURSE );
-    Foswiki::Func::registerTagHandler( 'ATTACHMENTS',   \&ATTACHMENTS );
-    Foswiki::Func::registerTagHandler( 'TOPICTITLE',    \&TOPICTITLE );
-    Foswiki::Func::registerTagHandler( 'GETTOPICTITLE', \&TOPICTITLE );
+  Foswiki::Func::registerTagHandler('DBQUERY', \&DBQUERY);
+  Foswiki::Func::registerTagHandler('DBCALL', \&DBCALL);
+  Foswiki::Func::registerTagHandler('DBSTATS', \&DBSTATS);
+  Foswiki::Func::registerTagHandler('DBDUMP', \&DBDUMP);    # for debugging
+  Foswiki::Func::registerTagHandler('DBRECURSE', \&DBRECURSE);
+  Foswiki::Func::registerTagHandler('ATTACHMENTS', \&ATTACHMENTS);
+  Foswiki::Func::registerTagHandler('TOPICTITLE', \&TOPICTITLE);
+  Foswiki::Func::registerTagHandler('GETTOPICTITLE', \&TOPICTITLE);
 
-    Foswiki::Func::registerRESTHandler( 'UpdateCache', \&updateCache );
+  Foswiki::Func::registerRESTHandler('UpdateCache', \&updateCache);
 
-    # SMELL: remove this when Foswiki::Cache got into the core
-    my $cache = $Foswiki::Plugins::SESSION->{cache}
-      || $Foswiki::Plugins::SESSION->{cache};
-    if ( defined $cache ) {
-        $addDependency = \&addDependencyHandler;
-    }
-    else {
-        $addDependency = \&nullHandler;
-    }
+  # SMELL: remove this when Foswiki::Cache got into the core
+  my $cache = $Foswiki::Plugins::SESSION->{cache}
+    || $Foswiki::Plugins::SESSION->{cache};
+  if (defined $cache) {
+    $addDependency = \&addDependencyHandler;
+  } else {
+    $addDependency = \&nullHandler;
+  }
 
-    $isInitialized = 0;
+  $isInitialized = 0;
 
-    return 1;
+  return 1;
 }
 
 ###############################################################################
 sub initCore {
-    return if $isInitialized;
-    $isInitialized = 1;
+  return if $isInitialized;
+  $isInitialized = 1;
 
-    eval 'use Foswiki::Plugins::DBCachePlugin::Core;';
-    die $@ if $@;
+  eval 'use Foswiki::Plugins::DBCachePlugin::Core;';
+  die $@ if $@;
 
-    Foswiki::Plugins::DBCachePlugin::Core::init( $baseWeb, $baseTopic );
+  Foswiki::Plugins::DBCachePlugin::Core::init($baseWeb, $baseTopic);
 }
 
 ###############################################################################
 # REST handler to allow offline cache updates
 sub updateCache {
-    my $session = shift;
-    my $web     = $session->{webName};
+  my $session = shift;
+  my $web = $session->{webName};
 
-    my $db = getDB($web);
-    $db->load(1) if $db;
+  my $db = getDB($web);
+  $db->load(1) if $db;
 }
 
 ###############################################################################
 # after save handlers
 sub afterSaveHandler {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler(@_);
 }
 
 ###############################################################################
 sub renderWikiWordHandler {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::renderWikiWordHandler(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::renderWikiWordHandler(@_);
 }
 
 ###############################################################################
 # tags
 sub DBQUERY {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::handleDBQUERY(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::handleDBQUERY(@_);
 }
 
 sub DBCALL {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::handleDBCALL(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::handleDBCALL(@_);
 }
 
 sub DBSTATS {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::handleDBSTATS(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::handleDBSTATS(@_);
 }
 
 sub DBDUMP {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::handleDBDUMP(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::handleDBDUMP(@_);
 }
 
 sub ATTACHMENTS {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::handleATTACHMENTS(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::handleATTACHMENTS(@_);
 }
 
 sub DBRECURSE {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::handleDBRECURSE(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::handleDBRECURSE(@_);
 }
 
 sub TOPICTITLE {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::handleTOPICTITLE(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::handleTOPICTITLE(@_);
 }
 
 ###############################################################################
 # perl api
 sub getDB {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::getDB(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::getDB(@_);
 }
 
 sub getTopicTitle {
-    initCore();
-    return Foswiki::Plugins::DBCachePlugin::Core::getTopicTitle(@_);
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::getTopicTitle(@_);
 }
 
 ###############################################################################
@@ -155,9 +154,9 @@ sub getTopicTitle {
 sub nullHandler { }
 
 sub addDependencyHandler {
-    my $cache = $Foswiki::Plugins::SESSION->{cache}
-      || $Foswiki::Plugins::SESSION->{cache};
-    return $cache->addDependency(@_);
+  my $cache = $Foswiki::Plugins::SESSION->{cache}
+    || $Foswiki::Plugins::SESSION->{cache};
+  return $cache->addDependency(@_);
 }
 
 ###############################################################################

@@ -455,22 +455,23 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
-|  18 Jun 2009: | (Crawford Currie) reverted to using !DBCacheContrib |
+|  28 Jun 2009: | final detwikification; added compatibility hack for current Foswiki/trunk |
+|  18 Jun 2009: | Crawford Currie: reverted to using !DBCacheContrib |
 |  09 Jan 2009: | internalized compatible version of DBCacheContrib; \
                   added limit to ATTACHMENTS and a few more ways to sort them |
 |  07 Jan 2009: | new global variable =dbQueryCurrentWeb= being set during a DBQUERY so that \
                   external predicates that depend on the web information can make use of it; \
                   renderWikiWord also displays topic titles for explicit links where the link text \
                   equals the topic name; internalized urlDecode and parseTime for \
-                  compatibility reasons; fixed info.author for newer twiki and foswiki engines |
+                  compatibility reasons; fixed info.author for newer foswiki engines |
 |  11 Dec 2008: | added =MemoryCache= flag to switch off memory persistence |
-|  11 Dec 2008: | working around issue in the TWiki/Foswiki parse \
+|  11 Dec 2008: | working around issue in the Foswiki parse \
                   where an undefined =%<nop>VAR%= in parametrized includes \
                   is expanded to VAR instead of \
                   leaving it to =%<nop>VAR%= |
 |  24 Sep 2008: | expanding common variables in footers and headers |
 |  03 Jul 2008: | fixed calculation of a topic title; \
-                  disabled =renderWikiWordHandler= for TWikis before 4.2, \
+                  disabled =renderWikiWordHandler= for legacy wiki engines, \
                   so not replacing the <nop>WikiName with its  <nop>TopicTitle  |
 |  28 Apr 2008: | implemented !TopicMethods in DBCALL |
 |  05 Feb 2008: | addded =rss()= feature to format strings |
@@ -482,7 +483,7 @@ This option only has an effect using speedy/perperl or fastcgi setups.
                   fixed sorting to be O(N log(N)) \
 		  removed topic access check unless absolutly necessary \
                   - SvenDowideit@home.org.au |
-|  19 Jun 2007: | added TWiki-4.2 upwards compatibility hack to display users as <nop>WikiNames; \
+|  19 Jun 2007: | added compatibility hack to display users as <nop>WikiNames; \
                   added expand(%TML%) feature |
 |  08 May 2007: | fixed loading db cache file since recent changes in <nop>DBCacheContrib |
 |  03 Apr 2007: | fixed $date(format) in ATTACHMENTS; \
@@ -491,7 +492,7 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 |  31 Jan 2007: | fixed caching "web" property of topics; \
                   fixed DBDUMP of topics w/o attachments;\
                   added numerical sorting of formfields; \
-                  added support for the TWiki::Cache; \
+                  added support for the Foswiki::Cache; \
                   added new tag DBRECURSE to itterate along topic relations |
 |  24 Jan 2007: | added ATTACHMENTS tag |
 |  09 Nov 2006: | fixed bug where a topic modification was not detected correctly resulting \
@@ -506,7 +507,7 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 		  added =remote= parameter to switch on/off fixing links in \
 		  transcluded content; \
 		  expansion of =$nop= and =$n= in that order |
-|  28 Sep 2006: | DBQUERY and DBSTATS did not obey twiki access rights |
+|  28 Sep 2006: | DBQUERY and DBSTATS did not obey access rights |
 |  19 Sep 2006: | added $key1...$key5 to the pattern matcher and formatter |
 |  18 Sep 2006: | properly fixed parsing $trunc,$flatten and $encode in format strings; \
                   multiple fixes for calls and formatting accross webs |
@@ -515,9 +516,9 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 |  15 June 2006: | generate an inline error instead of an oops on a bad search string to DBQUERY |
 |  05 Mai 2006: | don't segfault on uncompiled <nop>WebDB implementations |
 |  30 Mar 2006: | added <nop>WebDB property createdate formerly only known by the <nop>BlogPlugin;\
-                  dont choke twiki if DBDUMPing a non-existing topic; |
+                  dont choke if DBDUMPing a non-existing topic; |
 |  27 Mar 2006: | added $trunc() |
-|  20 Mar 2006: | using TWiki::Attrs to parse section names |
+|  20 Mar 2006: | using Foswiki::Attrs to parse section names |
 |  12 Mar 2006: | added hidenull to DBSTATS |
 |  10 Mar 2006: | use ENV instead of the CGI object to detect the current cgi action |
 |  02 Mar 2006: | fixed bad init error showing up on speedy/mod_perl |
