@@ -1,4 +1,4 @@
-%META:TOPICINFO{author="ProjectContributor" date="1222236379" format="1.1" reprev="1.3" version="1"}%
+%META:TOPICINFO{author="micha" date="1246521570" format="1.1" reprev="1.2" version="1.2"}%
 <!--
 
    PLEASE DO NOT EDIT THIS TOPIC
@@ -154,7 +154,7 @@ Fetch topic content or a section of it from the database store.
 | =remote="on,off"= | switch fixing !WikiWords in transcluded content; \
                      =on= means "don't touch, this is remote content" \
 		     defaults to "off" because that's the default behavior of \
-		     =%<nop>INCLUDE{}% (note, DBQUERY defaults to "on" \
+		     =%<nop>INCLUDE{}%= (note, DBQUERY defaults to "on" \
 		     aka do-not-touch-mode) |
 
 ---+++ DBDUMP
@@ -380,7 +380,7 @@ own <nop>WikiApplication. For example, the Foswiki:Extensions.BlogPlugin defines
 its own where it caches the createdate of a topic being either specified in a formfield  or
 given in the timestamp of the first revision of a topic.
 
----+++ DBCachePlugin 
+---+++ <nop>DBCachePlugin 
 ---++++ getDB()
 Returns a database object used for further queries.  This function must be
 called ahead of any actual database access. If your <nop>WikiApplication is
@@ -396,11 +396,11 @@ web one <nop>WikiApplication making use of this plugin.
 returns a database object. See the Foswiki:Extensions::DBCacheContrib documentation
 for its interfaces.
 
----+++ DBCachePlugin::WebDB 
+---+++ <nop>DBCachePlugin::WebDB 
 This implements the database object that is used to access the topic records in
 a web. Note, that for each web there is exactly one <nop>WebDB database object.
 A database object is fetched (and initialized if needed) by the
-DBCachePlugin::getDB() function. 
+<nop>DBCachePlugin::getDB() function. 
 
 ---++++ dbQuery()
 The DBQUERY functionality can be access from within perl using the plugins =dbQuery()= method.
@@ -434,10 +434,10 @@ returns the value of the named formfield
 See also DBCacheContrib for additional configuration settings.
 
 <!-- provided for compatibility only
-   * Set SHORTDESCRIPTION = Lightweight frontend to the DBCacheContrib
+   * Set SHORTDESCRIPTION = Lightweight frontend to the <nop>DBCacheContrib
 -->
 
-Each web can specify an alternative implementation inheriting from DBCachePlugin::WebDB.
+Each web can specify an alternative implementation inheriting from <nop>DBCachePlugin::WebDB.
 To specify it you have to set the =WEBDB= variable in the WebPreferences. The default is =Foswiki::Plugins::DBCachePlugin::WebDB=
    
 ---+++ <nop>MemoryCache

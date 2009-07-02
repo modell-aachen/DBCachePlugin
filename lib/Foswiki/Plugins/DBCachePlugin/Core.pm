@@ -384,7 +384,7 @@ sub handleDBCALL {
   my $thisTopic = $params->remove('_DEFAULT');
   return '' unless $thisTopic;
 
-  writeDebug("called handleDBCALL()");
+  #writeDebug("called handleDBCALL()");
 
   # check if this is an object call
   my $theObject;
@@ -426,7 +426,7 @@ sub handleDBCALL {
   my $remote = $params->remove('remote') || 'off';
   $remote = ($remote =~ /^(on|force|1|yes)$/)?1:0;
 
-  writeDebug("thisWeb=$thisWeb thisTopic=$thisTopic baseWeb=$baseWeb baseTopic=$baseTopic");
+  #writeDebug("thisWeb=$thisWeb thisTopic=$thisTopic baseWeb=$baseWeb baseTopic=$baseTopic");
 
   # get web and topic
   my $thisDB = getDB($thisWeb);
@@ -880,7 +880,7 @@ sub handleATTACHMENTS {
   my $index = 0;
   foreach my $attachment (@attachments) {
     my $name = $attachment->fastget('name');
-    writeDebug("name=$name");
+    #writeDebug("name=$name");
     next unless $name =~ /^($theNames)$/;
 
     my $attr = $attachment->fastget('attr');
@@ -1185,9 +1185,9 @@ sub getDB {
       $webDBIsModified{$theWeb} = $webDB{$theWeb}->isModified();
       if (DEBUG) {
         if ($webDBIsModified{$theWeb}) {
-          #writeDebug("reloading modified $theWeb");
+          writeDebug("reloading modified $theWeb");
         } else {
-          #writeDebug("don't need to load webdb for $theWeb");
+          writeDebug("don't need to load webdb for $theWeb");
         }
       }
     }
@@ -1199,9 +1199,8 @@ sub getDB {
       || 'Foswiki::Plugins::DBCachePlugin::WebDB';
     $impl =~ s/^\s+//go;
     $impl =~ s/\s+$//go;
-    #writeDebug("loading new webdb for '$theWeb($isModified) '");
+    writeDebug("loading new webdb for '$theWeb($isModified) '");
     #writeDebug("impl='$impl'");
-    delete $webDB{$theWeb} if $webDB{$theWeb};
     $webDB{$theWeb} = new $impl($theWeb);
     $webDB{$theWeb}->load($doRefresh);
     $webDBIsModified{$theWeb} = 0;

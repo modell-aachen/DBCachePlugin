@@ -24,6 +24,8 @@ use Foswiki::Plugins::DBCachePlugin ();
 use Foswiki::Attrs ();
 use Error qw(:try);
 
+use constant DEBUG => 0; # toggle me
+
 @Foswiki::Plugins::DBCachePlugin::WebDB::ISA = ("Foswiki::Contrib::DBCacheContrib");
 
 ###############################################################################
@@ -31,6 +33,8 @@ sub new {
   my ($class, $web, $cacheName) = @_;
 
   $cacheName = 'DBCachePluginDB' unless $cacheName;
+
+  writeDebug("new WebDB for $web");
 
   my $this = bless($class->SUPER::new($web, $cacheName), $class);
   $this->{_loadTime} = 0;
@@ -40,17 +44,27 @@ sub new {
 }
 
 ###############################################################################
+sub writeDebug {
+  print STDERR "- DBCachePlugin::WebDB - $_[0]\n" if DEBUG;
+}
+
+
+###############################################################################
 # cache time we loaded the cacheFile
 sub load {
   my $this = shift;
 
+  writeDebug("called load() for $this->{web}");
+
   # first load
-  my $result = $this->SUPER::load(@_);
+  my ($readFromCache, $readFromFile, $removed) = $this->SUPER::load(@_);
 
   # then get the time stamp
   $this->{_loadTime} = $this->_getModificationTime();
 
-  return $result;
+  writeDebug("readFromCache=$readFromCache, readFromFile=$readFromFile, removed=$removed");
+
+  return ($readFromCache, $readFromFile, $removed);
 }
 
 ###############################################################################
@@ -59,8 +73,11 @@ sub _getCacheFile {
 
   my $workDir = Foswiki::Func::getWorkArea('DBCacheContrib');
   my $web = $this->{web};
-  $web =~ s/\//\./go;
-  my $cacheFile = "$workDir/$web.$this->{_cachename}";
+  $web =~ s/\./\//go;
+  my $cacheFile = "$workDir/$web/$this->{_cachename}";
+
+  writeDebug("cacheFile=$cacheFile");
+  #die "cacheFile $cacheFile not found" unless -f $cacheFile;
 
   return $cacheFile;
 }
@@ -98,7 +115,7 @@ sub isModified {
 sub onReload {
   my ($this, $topics) = @_;
 
-  #print STDERR "DEBUG: DBCachePlugin::WebDB - called onReload(".join(', ', @$topics).")\n";
+  writeDebug("called onReload()");
 
   foreach my $topicName (@$topics) {
     my $topic = $this->fastget($topicName);
@@ -111,10 +128,7 @@ sub onReload {
       next;
     }
 
-    # save web
-    $topic->set('web', $this->{web});
-
-    #print STDERR "DEBUG: reloading $topicName\n";
+    writeDebug("reloading $topicName");
 
     # createdate
     my ($createDate) = &Foswiki::Func::getRevisionInfo($this->{web}, $topicName, 1);
@@ -324,11 +338,8 @@ sub dbQuery {
           $theSort =~ s/\$n/\n/go;
           $theSort =~ s/\$dollar/\$/go;
           $sorting{$topicName} = $this->expandPath($topicObj, $theSort);
-          if (($doNumericalSort == 1)
-            && !($sorting{$topicName} =~ /^[+-]?\d+(\.\d+)?$/))
-          {
-            $doNumericalSort = 0;
-          }
+          $doNumericalSort = 0 
+            if ($doNumericalSort == 1) && !($sorting{$topicName} =~ /^[+-]?\d+(\.\d+)?$/);
         }
       }
     }
