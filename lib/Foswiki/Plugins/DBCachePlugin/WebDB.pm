@@ -18,9 +18,10 @@
 package Foswiki::Plugins::DBCachePlugin::WebDB;
 
 use strict;
-use Foswiki::Contrib::DBCacheContrib;
-use Foswiki::Plugins::DBCachePlugin;
-use Foswiki::Attrs;
+use Foswiki::Contrib::DBCacheContrib ();
+use Foswiki::Contrib::DBCacheContrib::Search ();
+use Foswiki::Plugins::DBCachePlugin ();
+use Foswiki::Attrs ();
 use Error qw(:try);
 
 @Foswiki::Plugins::DBCachePlugin::WebDB::ISA = ("Foswiki::Contrib::DBCacheContrib");
@@ -97,7 +98,7 @@ sub isModified {
 sub onReload {
   my ($this, $topics) = @_;
 
-  #print STDERR "DEBUG: DBCachePlugin::WebDB - called onReload(@_)\n";
+  #print STDERR "DEBUG: DBCachePlugin::WebDB - called onReload(".join(', ', @$topics).")\n";
 
   foreach my $topicName (@$topics) {
     my $topic = $this->fastget($topicName);

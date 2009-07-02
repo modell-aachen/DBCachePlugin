@@ -18,7 +18,7 @@ use strict;
 use vars qw( 
   $TranslationToken %webDB %webDBIsModified $wikiWordRegex $webNameRegex
   $defaultWebNameRegex $linkProtocolPattern $tagNameRegex
-  $baseWeb $baseTopic %MON2NUM $dbQueryCurrentWeb
+  $baseWeb $baseTopic %MON2NUM $dbQueryCurrentWeb $doRefresh
 );
 
 %MON2NUM = (
@@ -64,22 +64,22 @@ sub init {
 
   if (!$memoryCache) {
     %webDB = ();
-    }
-    else {
-        my $doRefresh = $query->param('refresh') || '';
-        if ( $doRefresh =~ /^(on|dbcache)$/ ) {
+  } else {
+    $doRefresh = $query->param('refresh') || '';
+    if ( $doRefresh =~ /^(on|dbcache)$/ ) {
+      $doRefresh = 1;
       %webDB = ();
-      #writeDebug("found refresh=on in urlparam");
+      writeDebug("found refresh=on in urlparam");
+    } else {
+      $doRefresh = 0;
     }
   }
 
-    $wikiWordRegex = Foswiki::Func::getRegularExpression('wikiWordRegex');
-    $webNameRegex  = Foswiki::Func::getRegularExpression('webNameRegex');
-  $defaultWebNameRegex = 
-    Foswiki::Func::getRegularExpression('defaultWebNameRegex');
-  $linkProtocolPattern = 
-    Foswiki::Func::getRegularExpression('linkProtocolPattern');
-    $tagNameRegex = Foswiki::Func::getRegularExpression('tagNameRegex');
+  $wikiWordRegex = Foswiki::Func::getRegularExpression('wikiWordRegex');
+  $webNameRegex  = Foswiki::Func::getRegularExpression('webNameRegex');
+  $defaultWebNameRegex = Foswiki::Func::getRegularExpression('defaultWebNameRegex');
+  $linkProtocolPattern = Foswiki::Func::getRegularExpression('linkProtocolPattern');
+  $tagNameRegex = Foswiki::Func::getRegularExpression('tagNameRegex');
 }
 
 ###############################################################################
@@ -106,16 +106,24 @@ sub renderWikiWordHandler {
 
 ###############################################################################
 sub afterSaveHandler {
-  #TODO: re-do this so it only reparses the topic that was saved
+  #my ($text, $topic, $web, $meta) = @_;
+  my $topic = $_[1];
+  my $web = $_[2];
 
-  # force reload
-  my $db = getDB($baseWeb);
-  #writeDebug("touching webdb for $baseWeb");
-  $db->touch();
-  if ($baseWeb ne $_[2]) {
-    $db = getDB($_[2]); 
-    #writeDebug("touching webdb for $_[2]");
+  my $doFullUpdate = $Foswiki::cfg{DBCacheContrib}{AlwaysUpdateCache};
+  $doFullUpdate = 1 unless defined $doFullUpdate;
+
+  if ($doFullUpdate) {
+    my $db = getDB($baseWeb);
     $db->touch();
+
+    if ($baseWeb ne $web) {
+      $db = getDB($web); 
+      $db->touch();
+    }
+  } else {
+    my $db = getDB($web);
+    $db->loadTopic($web, $topic);
   }
 }
 
@@ -1193,9 +1201,9 @@ sub getDB {
     $impl =~ s/\s+$//go;
     #writeDebug("loading new webdb for '$theWeb($isModified) '");
     #writeDebug("impl='$impl'");
-    $webDB{$theWeb}->DESTROY() if $webDB{$theWeb};
+    delete $webDB{$theWeb} if $webDB{$theWeb};
     $webDB{$theWeb} = new $impl($theWeb);
-    $webDB{$theWeb}->load();
+    $webDB{$theWeb}->load($doRefresh);
     $webDBIsModified{$theWeb} = 0;
   }
 
@@ -1215,7 +1223,7 @@ sub DESTROY_ALL {
   foreach my $web (keys %webDB) {
     #writeDebug("closing db for $web");
     $webDB{$web}->touch();
-    $webDB{$web}->DESTROY();
+    delete $webDB{$web};
   }
   %webDB = ();
   %webDBIsModified = ();
@@ -1273,6 +1281,8 @@ sub expandVariables {
   return '' unless $theFormat;
   
   foreach my $key (keys %params) {
+    my $val = $params{$key};
+    next unless defined $val;
     if($theFormat =~ s/\$$key\b/$params{$key}/g) {
       #writeDebug("expanding $key->$params{$key}");
     }

@@ -455,6 +455,7 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  02 Jul 2009: | optimed cache maintenance cycles by making use of new =loadTopic()= api in !DBCacheContrib |
 |  28 Jun 2009: | final detwikification; added compatibility hack for current Foswiki/trunk |
 |  18 Jun 2009: | Crawford Currie: reverted to using !DBCacheContrib |
 |  09 Jan 2009: | internalized compatible version of DBCacheContrib; \
