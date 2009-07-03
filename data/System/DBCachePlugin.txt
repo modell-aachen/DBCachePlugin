@@ -1,4 +1,4 @@
-%META:TOPICINFO{author="micha" date="1246521570" format="1.1" reprev="1.2" version="1.2"}%
+%META:TOPICINFO{author="ProjectContributor" date="1246521570" format="1.1" reprev="1.2" version="1.2"}%
 <!--
 
    PLEASE DO NOT EDIT THIS TOPIC
@@ -433,10 +433,6 @@ returns the value of the named formfield
 ---++ Plugin Settings
 See also DBCacheContrib for additional configuration settings.
 
-<!-- provided for compatibility only
-   * Set SHORTDESCRIPTION = Lightweight frontend to the <nop>DBCacheContrib
--->
-
 Each web can specify an alternative implementation inheriting from <nop>DBCachePlugin::WebDB.
 To specify it you have to set the =WEBDB= variable in the WebPreferences. The default is =Foswiki::Plugins::DBCachePlugin::WebDB=
    
@@ -446,9 +442,12 @@ the dbcache once loaded into memory will stay there among multiple requests.
 This option only has an effect using speedy/perperl or fastcgi setups.
 
 ---++ Plugin Installation Instructions
-
 %$INSTALL_INSTRUCTIONS%
 
+---++ Plugin Info
+<!-- 
+   * Set SHORTDESCRIPTION = Lightweight frontend to the <nop>DBCacheContrib
+-->
 |  Author: | Michael Daum |
 |  Copyright &copy;: | 2005-2009, Michael Daum http://michaeldaumconsulting.com |
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
@@ -536,7 +535,7 @@ This option only has an effect using speedy/perperl or fastcgi setups.
                   support for STARTSECTION, old SECTION being deprecated |
 |  24 Nov 2005: | Initial version |
 |  Dependencies: | %$DEPENDENCIES% |
-|  Home: | http://foswiki.org/Extensions/%TOPIC% |
-|  Support: | http://foswiki.org/Support/%TOPIC% |
+|  Home: | Foswiki:Extensions/%TOPIC% |
+|  Support: | Foswiki:Support/%TOPIC% |
 
 %META:FILEATTACHMENT{name="wikiringlogo40x40.png" attr="h" autoattached="1" comment="" date="1207666446" path="wikiringlogo40x40.png" size="2571" user="ProjectContributor" version="1"}%
