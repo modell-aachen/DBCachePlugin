@@ -1077,6 +1077,7 @@ sub formatRecursive {
   $number ||= '';
 
   return if $params->{depth} && $depth >= $params->{depth};
+  return if $params->{limit} && $params->{_count} >= $params->{limit};
 
   #writeDebug("called formatRecursive($theWeb, $theTopic)");
   return unless $theTopic;

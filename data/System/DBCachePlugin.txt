@@ -58,7 +58,7 @@ mechanism for !TopicMethods proceeds as normal if the DBCALl is not of the form
 ="SomeTopic->RenderMethod"=. For example, if =SomeTopic= is of type =Video, <nop>MediaType, <nop>ClassifiedTopic=
 the lookup mechanism will try to find the methods =VideoRenderMethod=, =MediaTypeRenderMethod=
 and =ClassifiedTopicRenderMethod= in the given order and use the one found first. The web
-these types are defined in is infered on the base of the !DataForm definitions of each of 
+these types are defined in is inferred on the base of the !DataForm definitions of each of 
 these types. If none of these type-specific methods is found the method call will fallback
 to a normal non-specific function call. The !TopicMethod itself is called with an implicit
 parameter =OBJECT= that refers to =SomeTopic=, that is the object this method has been called for.
@@ -67,7 +67,7 @@ parameter =OBJECT= that refers to =SomeTopic=, that is the object this method ha
 what and how to display attachments. 
 
 *DBRECURSE* iterates over topics in a web following a certain topic-to-topic relation, like
-the partent-child relation among topics. You can define arbitrary relations using filters.
+the parent-child relation among topics. You can define arbitrary relations using filters.
 
 
 ---++ Syntax
@@ -86,7 +86,7 @@ limit the number of attachments to be listed.
 | =maxdate="..."= | specify latest attachment |
 | =maxsize="..."= | specify biggest attachment |
 | =mindate="..."= | specify earliest attachment |
-| =minsize="..."= | specify smalles attachment |
+| =minsize="..."= | specify smallest attachment |
 | =names="..."= | match the name of attachments to be include in the list |
 | =user="..."= | match the attachments' user who uploaded it |
 | =footer="..."= | format string appended to the result |
@@ -94,8 +94,8 @@ limit the number of attachments to be listed.
 | =header="..."= | format string prefixing the resulting output |
 | =separator="..."= | format string put between each formatted attachment  |
 | =hidenull="on,off"= | hide/display the empty result; only the header and the footer are included \
-                of set to "off" and there's no attachment at the given topic |
-| =sort="name,date,size,user,comment,commet:name"= | sortion of result |
+                if set to "off" and there's no attachment at the given topic |
+| =sort="name,date,size,user,comment,comment:name"= | sort results by specified field |
 | =reverse="on/off"= | enable reverse sorting |
 | =limit="..."= | limit the number of attachments to the given number; by default show all |
 
@@ -149,16 +149,16 @@ Fetch topic content or a section of it from the database store.
 | ="&lt;topic>"= | topic that we'd like to call |
 | =section="..."= | optional named section; without this parameter the "default" section is used |
 | =&lt;key>="&lt;value>"= | topic arguments to be substituted within the included text; that is \
-            every occurence of &lt;key> is substituted with &lt;value> |
+            every occurrence of &lt;key> is substituted with &lt;value> |
 | =warn="on,off"= | enable/suppress error warnings |
 | =remote="on,off"= | switch fixing !WikiWords in transcluded content; \
                      =on= means "don't touch, this is remote content" \
-		     defaults to "off" because that's the default behavior of \
+		     defaults to "off" because that's the default behaviour of \
 		     =%<nop>INCLUDE{}%= (note, DBQUERY defaults to "on" \
 		     aka do-not-touch-mode) |
 
 ---+++ DBDUMP
-Display the database record of a topic (usefull for debugging).
+Display the database record of a topic (useful for debugging).
 
 *Syntax:*
 | *%<nop>DBDUMP{"&lt;topic>" ... }%* ||
@@ -225,7 +225,7 @@ another topic B (by using its name) you can access the "Headline" in B from A us
 A formfield accessor can be a composed one using 'or' and 'and'. Example: =$expand(Name or Author)=
 will expand to the value of the formfield "Name" if it exists and is non-empty and to the value 
 of the formfield "Author" otherwise. More valid examples:
-   * =$expand(@Ref.Headline)=: headline of the refered topic
+   * =$expand(@Ref.Headline)=: headline of the referred topic
    * =$expand(Nr and '.')=: append a dot to the formfield value "Nr" if it exists
    * =$expand(Name or Author)=: expand to "Name" or "Author"
 
@@ -250,15 +250,15 @@ Traverse topic-to-topic relations, like the intrinsic parent-child relation
 | =subfooter="..."= | format string to be appended to each subordinated search, defaults to =footer= parameter |
 | =singlefooter="..."= | format string to be used when only one topic is found |
 | =hidenull="..."= | flag to indicate that an empty hit set should not be displayed |
-| =filter="..."= | search expression that is used in earch recursion step; \
+| =filter="..."= | search expression that is used in each recursion step; \
                    the current topic name is inserted into the filter expression by replacing the ='$ref'= string; \
                    the default filter is ='parent='$name'=; this will search for topics of which the current topic \
                    is a parent |
-| =sort="..."= | determines the sortion of topics in each itteration step |
+| =sort="..."= | determines the sorting order of topics in each iteration step |
 | =reverse="on,off"= | reverse sorting order |
-| =limit="..."= | maximum itterations, default is =0= (unlimitted) |
+| =limit="..."= | maximum iterations, default is =0= (unlimited) |
 | =skip="..."= | skips the first =n= hits when formatting the output, defaults to =0= (no skip) |
-| =depth="..."= | only recurse to a given depth, defaults to =0= (unlimitted) |
+| =depth="..."= | only recurse to a given depth, defaults to =0= (unlimited) |
 | =include="..."= | regular expression topics must match to be included in the search |
 | =exclude="..."= | regular expression that excludes matching topics from the search |
 
@@ -306,7 +306,7 @@ Compute and format a statistics on the database.
 | =footer="..."= | footer format string to be appended to the output |
 | =sort="alpha,created"= | order of keys in the output |
 | =reverse="on,off"= | sort keys descending or ascending |
-| =limit="..."= | maximum number of keys to be formated in the output |
+| =limit="..."= | maximum number of keys to be formatted in the output |
 | =hidenull="..."= | flag to indicate that an empty hit set should not be displayed |
 
 The DBSTATS searches for all topics in given web and reads the given form fields.
@@ -319,11 +319,11 @@ Format strings (=header=, =format=, =footer=) can use the following variables to
 the computed statistics:
    * $key, $key1: the found key, this must match the first group in the pattern argument
    * $key2, $key3, $key4,$key5: second, third, etc grouping in the =pattern= argument
-   * $count: the number of occurences of the key
+   * $count: the number of occurrences of the key
    * $index: index of the key within the sorted result set
    * $min: minimum count found in the search
    * $max: maximum count found in the search
-   * $mean: mean occurence of a key in the result set
+   * $mean: mean occurrence of a key in the result set
    * $keys: total number of keys found
    * $web: the web we search in
    * $topics: the list of all topics where the keys where found
