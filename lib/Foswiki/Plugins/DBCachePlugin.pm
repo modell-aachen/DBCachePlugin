@@ -27,7 +27,7 @@ use vars qw(
 );
 
 $VERSION = '$Rev$';
-$RELEASE = '3.11';
+$RELEASE = '3.20';
 $NO_PREFS_IN_TOPIC = 1;
 $SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 
@@ -50,7 +50,8 @@ sub initPlugin {
   Foswiki::Func::registerTagHandler('TOPICTITLE', \&TOPICTITLE);
   Foswiki::Func::registerTagHandler('GETTOPICTITLE', \&TOPICTITLE);
 
-  Foswiki::Func::registerRESTHandler('UpdateCache', \&updateCache);
+  Foswiki::Func::registerRESTHandler('UpdateCache', \&restUpdateCache);
+  Foswiki::Func::registerRESTHandler('dbdump', \&restDBDUMP);
 
   # SMELL: remove this when Foswiki::Cache got into the core
   my $cache = $Foswiki::Plugins::SESSION->{cache}
@@ -79,7 +80,7 @@ sub initCore {
 
 ###############################################################################
 # REST handler to allow offline cache updates
-sub updateCache {
+sub restUpdateCache {
   my $session = shift;
   my $web = $session->{webName};
 
@@ -88,10 +89,39 @@ sub updateCache {
 }
 
 ###############################################################################
+# REST handler to debug a topic in cache
+sub restDBDUMP {
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::restDBDUMP(@_);
+}
+
+###############################################################################
 # after save handlers
 sub afterSaveHandler {
+  #my ($text, $topic, $web, $meta) = @_;
   initCore();
-  return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler(@_);
+  return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler($_[2], $_[1]);
+}
+
+###############################################################################
+# deprecated: use afterUploadSaveHandler instead
+sub afterAttachmentSaveHandler {
+  #my ($attrHashRef, $topic, $web) = @_;
+  return if $Foswiki::Plugins::VERSION >= 2.1 || 
+    $Foswiki::cfg{DBCache}{UseUploadHandler}; # set this to true if you backported the afterUploadHandler
+
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler($_[2], $_[1]);
+}
+
+###############################################################################
+# Foswiki::Plugins::VERSION >= 2.1
+sub afterUploadHandler {
+  my ($attrHashRef, $meta) = @_;
+  my $web = $meta->web;
+  my $topic = $meta->topic;
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler($web, $topic);
 }
 
 ###############################################################################
@@ -156,7 +186,7 @@ sub nullHandler { }
 sub addDependencyHandler {
   my $cache = $Foswiki::Plugins::SESSION->{cache}
     || $Foswiki::Plugins::SESSION->{cache};
-  return $cache->addDependency(@_);
+  return $cache->addDependency(@_) if $cache;
 }
 
 ###############################################################################

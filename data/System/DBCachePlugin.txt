@@ -215,6 +215,9 @@ Following variables are expanded in format strings:
    * $encode(...): encode entities so that the text can be included in HTML input form elements
    * $flatten(...): remove any special markup producing a flattened text representation
    * $trunc(...,length): truncate a string to the given length
+   * $d2n(...): converts a date string to epoch seconds
+   * $uc(...): converts a string to upper case
+   * $lc(...): converts a string to lower case
 
 *Formfield accessors:*
 
@@ -295,9 +298,11 @@ Compute and format a statistics on the database.
 | ="&lt;search>"= | query string that defines a search, see DBCacheContrib |
 | =web="..."= | the web where to search in (default: current web) |
 | =field(s)="..."= | name of one or more formfields to be extracted (default: "text") |
+| =split="..."= | regex split up a field value into a list before matching each item against =pattern= |
 | =pattern="..."= | regex pattern to extract keys from the formfield(s); \
+                    note, that before the pattern is applied the field value is split up using the =split= parameter;
                     you must provide at least one grouping ("(...)") in the pattern string that \
-		    encloses the key to be extracted (default: "(\w+)"); \
+		    encloses the key to be extracted (default: "^(.*)$"); \
 		    you may have up to five groupings in one pattern that are \
 		    accessible each in the format string |
 | =header="..."= | header format string to be prepended to the output |
@@ -310,7 +315,7 @@ Compute and format a statistics on the database.
 | =hidenull="..."= | flag to indicate that an empty hit set should not be displayed |
 
 The DBSTATS searches for all topics in given web and reads the given form fields.
-It then uses the =pattern= to extract any key in the data and counts their occurrence.
+It then uses the =split= and =pattern= parameters to extract all keys in the data counting their occurrences.
 The result is rendered using the =format= parameter for each token found, separating them
 by =sep=, prepend the =header= and append the =footer=. Results can be sorted alphabetically
 or by createdate.
@@ -454,6 +459,12 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  17 Nov 2009: | fixed incremental cache updates; \
+                  exclude autoinc pattern in TOPICTITLE; \
+                  properly combine header, body and footer in DBQUERY to support CALC; \
+                  added =split= and =casesensitive= to DBSTATS; \
+                  added support for standard escapes in DBQUERY's =sort=; \ 
+                  added =$d2n()= , =$uc()=, =$lc()= |
 |  02 Jul 2009: | optimed cache maintenance cycles by making use of new =loadTopic()= api in !DBCacheContrib |
 |  28 Jun 2009: | final detwikification; added compatibility hack for current Foswiki/trunk |
 |  18 Jun 2009: | Crawford Currie: reverted to using !DBCacheContrib |

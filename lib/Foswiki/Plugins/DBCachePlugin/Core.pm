@@ -42,7 +42,7 @@ use Foswiki::Contrib::DBCacheContrib ();
 use Foswiki::Contrib::DBCacheContrib::Search ();
 use Foswiki::Plugins::DBCachePlugin::WebDB ();
 use Foswiki::Sandbox ();
-use Time::Local ();
+use Time::Local;
 
 $TranslationToken = "\0"; # from Foswiki.pm
 
@@ -106,9 +106,7 @@ sub renderWikiWordHandler {
 
 ###############################################################################
 sub afterSaveHandler {
-  #my ($text, $topic, $web, $meta) = @_;
-  my $topic = $_[1];
-  my $web = $_[2];
+  my ($web, $topic) = @_;
 
   my $doFullUpdate = $Foswiki::cfg{DBCacheContrib}{AlwaysUpdateCache};
   $doFullUpdate = 1 unless defined $doFullUpdate;
@@ -117,6 +115,7 @@ sub afterSaveHandler {
     my $db = getDB($baseWeb);
     $db->touch();
 
+    # move/rename from one web to the other
     if ($baseWeb ne $web) {
       $db = getDB($web); 
       $db->touch();
@@ -124,6 +123,19 @@ sub afterSaveHandler {
   } else {
     my $db = getDB($web);
     $db->loadTopic($web, $topic);
+
+    # move/rename 
+    if ($baseWeb eq $web) {
+      if ($topic ne $baseTopic) {
+        $db->loadTopic($web, $baseTopic)
+      }
+    } else { # crossing webs
+      $db = getDB($baseWeb); 
+      $db->loadTopic($baseWeb, $topic);
+      if ($topic ne $baseTopic) {
+        $db->loadTopic($baseWeb, $baseTopic)
+      }
+    }
   }
 }
 
@@ -139,11 +151,16 @@ sub handleTOPICTITLE {
   $thisTopic =~ s/^\s+//go;
   $thisTopic =~ s/\s+$//go;
 
+  ($thisWeb, $thisTopic) =
+    Foswiki::Func::normalizeWebTopicName($thisWeb, $thisTopic);
+
   my $topicTitle = getTopicTitle($thisWeb, $thisTopic);
 
-  if (defined($theDefault) && $topicTitle eq $thisTopic) {
+  if ($topicTitle eq $thisTopic && defined($theDefault)) {
     $topicTitle = $theDefault;
   }
+
+  return '' if $topicTitle =~ /X{10}|AUTOINC\d/;
 
   return urlEncode($topicTitle) if $theEncoding eq 'url';
   return entityEncode($topicTitle) if $theEncoding eq 'entity';
@@ -155,8 +172,8 @@ sub handleTOPICTITLE {
 sub getTopicTitle {
   my ($theWeb, $theTopic) = @_;
 
-    ( $theWeb, $theTopic ) =
-      Foswiki::Func::normalizeWebTopicName( $theWeb, $theTopic );
+  ($theWeb, $theTopic) =
+    Foswiki::Func::normalizeWebTopicName($theWeb, $theTopic);
 
   my $db = getDB($theWeb);
   return $theTopic unless $db;
@@ -196,10 +213,6 @@ sub handleDBQUERY {
   $theRemote = ($theRemote =~ /^(on|force|1|yes)$/)?1:0;
   $theRemote = ($theRemote eq 'on')?1:0;
 
-  # normalize 
-  $theSkip =~ s/[^-\d]//go;
-  $theSkip = 0 if $theSkip eq '';
-  $theSkip = 0 if $theSkip < 0;
   $theFormat = '$topic' unless defined $theFormat;
   $theFormat = '' if $theFormat eq 'none';
   $theSep = $params->{sep} unless defined $theSep;
@@ -217,6 +230,16 @@ sub handleDBQUERY {
       @topicNames = split(/\s*,\s*/, $theTopics);
     }
   }
+
+  # normalize 
+  unless ($theSkip =~ /^[\d]+$/) {
+    $theSkip = expandVariables($theSkip, $thisWeb, $thisTopic);
+    $theSkip = Foswiki::Func::expandCommonVariables($theSkip, $thisTopic, $thisWeb);
+  }
+  $theSkip =~ s/[^-\d]//go;
+  $theSkip = 0 if $theSkip eq '';
+  $theSkip = 0 if $theSkip < 0;
+
   my $theDB = getDB($thisWeb);
 
   # flag the current web we evaluate this query in, used by web-specific operators
@@ -227,12 +250,16 @@ sub handleDBQUERY {
 
   return inlineError($msg) if $msg;
 
+  my $count = scalar(@$topicNames);
+  return '' if ($count <= $theSkip) && $theHideNull eq 'on';
+
+  unless ($theLimit =~ /^[\d]+$/) {
+    $theLimit = expandVariables($theLimit, $thisWeb, $thisTopic);
+    $theLimit = Foswiki::Func::expandCommonVariables($theLimit, $thisTopic, $thisWeb);
+  }
   $theLimit =~ s/[^\d]//go;
   $theLimit = scalar(@$topicNames) if $theLimit eq '';
   $theLimit += $theSkip;
-
-  my $count = scalar(@$topicNames);
-  return '' if ($count <= $theSkip) && $theHideNull eq 'on';
 
   # format
   my $text = '';
@@ -274,16 +301,12 @@ sub handleDBQUERY {
     }
   }
 
-  if (defined $theHeader) {
-    $theHeader = expandVariables($theHeader, $thisWeb, $thisTopic, count=>$count, web=>$thisWeb);
-    $theHeader = Foswiki::Func::expandCommonVariables($theHeader, $thisTopic, $thisWeb);
-  }
-  if (defined $theFooter) {
-    $theFooter = expandVariables($theFooter, $thisWeb, $thisTopic, count=>$count, web=>$thisWeb);
-    $theFooter = Foswiki::Func::expandCommonVariables($theFooter, $thisTopic, $thisWeb);
-  }
+  $theHeader = expandVariables($theHeader, $thisWeb, $thisTopic, count=>$count, web=>$thisWeb)
+    if $theHeader;
+  $theFooter = expandVariables($theFooter, $thisWeb, $thisTopic, count=>$count, web=>$thisWeb)
+    if defined $theFooter;
 
-  $text = $theHeader.$text.$theFooter;
+  $text = Foswiki::Func::expandCommonVariables($theHeader.$text.$theFooter, $thisTopic, $thisWeb);
 
   fixInclude($session, $thisWeb, $text) if $theRemote;
 
@@ -541,7 +564,8 @@ sub handleDBSTATS {
   my $theSearch = $params->{_DEFAULT} || $params->{search} || '';
   my $thisWeb = $params->{web} || $baseWeb;
   my $thisTopic = $params->{topic} || $baseTopic;
-  my $thePattern = $params->{pattern} || '(\w+)';
+  my $thePattern = $params->{pattern} || '^(.*)$';
+  my $theSplit = $params->{split} || '\s*,\s*';
   my $theHeader = $params->{header} || '';
   my $theFormat = $params->{format};
   my $theFooter = $params->{footer} || '';
@@ -553,15 +577,19 @@ sub handleDBSTATS {
   my $theHideNull = $params->{hidenull} || 'off';
   my $theExclude = $params->{exclude};
   my $theInclude = $params->{include};
+  my $theCase = $params->{casesensitive} || 'off';
   $theLimit =~ s/[^\d]//go;
 
   $theFormat = '   * $key: $count' unless defined $theFormat;
   $theSep = $params->{sep} unless defined $theSep;
   $theSep = '$n' unless defined $theSep;
 
+  $theCase = ($theCase eq 'on'?1:0);
+
   #writeDebug("theSearch=$theSearch");
   #writeDebug("thisWeb=$thisWeb");
   #writeDebug("thePattern=$thePattern");
+  #writeDebug("theSplit=$theSplit");
   #writeDebug("theHeader=$theHeader");
   #writeDebug("theFormat=$theFormat");
   #writeDebug("theFooter=$theFooter");
@@ -600,31 +628,38 @@ sub handleDBSTATS {
       next unless $fieldValue; # unless present
       #writeDebug("reading field $field found $fieldValue");
 
-      while ($fieldValue =~ /$thePattern/g) { # loop over all occurrences of the pattern
-	my $key1 = $1;
-	my $key2 = $2 || '';
-	my $key3 = $3 || '';
-	my $key4 = $4 || '';
-	my $key5 = $5 || '';
-        next if $theExclude && $key1 =~ /$theExclude/;
-        next if $theInclude && $key1 !~ /$theInclude/;
-	my $record = $statistics{$key1};
-	if ($record) {
-	  $record->{count}++;
-	  $record->{from} = $createdate if $record->{from} > $createdate;
-	  $record->{to} = $createdate if $record->{to} < $createdate;
-	  push @{$record->{topics}}, $topicName;
-	} else {
-	  my %record = (
-	    count=>1,
-	    from=>$createdate,
-	    to=>$createdate,
-	    keyList=>[$key1, $key2, $key3, $key4, $key5],
-	    topics=>[$topicName],
-	  );
-	  $statistics{$key1} = \%record;
-	}
-        $Foswiki::Plugins::DBCachePlugin::addDependency->($thisWeb, $topicName);
+      foreach my $item (split(/$theSplit/, $fieldValue)) {
+        while ($item =~ /$thePattern/g) { # loop over all occurrences of the pattern
+          my $key1 = $1;
+          my $key2 = $2 || '';
+          my $key3 = $3 || '';
+          my $key4 = $4 || '';
+          my $key5 = $5 || '';
+          if ($theCase) {
+            next if $theExclude && $key1 =~ /$theExclude/;
+            next if $theInclude && $key1 !~ /$theInclude/;
+          } else {
+            next if $theExclude && $key1 =~ /$theExclude/i;
+            next if $theInclude && $key1 !~ /$theInclude/i;
+          }
+          my $record = $statistics{$key1};
+          if ($record) {
+            $record->{count}++;
+            $record->{from} = $createdate if $record->{from} > $createdate;
+            $record->{to} = $createdate if $record->{to} < $createdate;
+            push @{$record->{topics}}, $topicName;
+          } else {
+            my %record = (
+              count=>1,
+              from=>$createdate,
+              to=>$createdate,
+              keyList=>[$key1, $key2, $key3, $key4, $key5],
+              topics=>[$topicName],
+            );
+            $statistics{$key1} = \%record;
+          }
+          $Foswiki::Plugins::DBCachePlugin::addDependency->($thisWeb, $topicName);
+        }
       }
     }
   }
@@ -711,14 +746,31 @@ sub handleDBDUMP {
 
   $Foswiki::Plugins::DBCachePlugin::addDependency->($thisWeb, $thisTopic);
 
-  my $theDB = getDB($thisWeb);
+  return dbDump($thisWeb, $thisTopic);
+}
 
-  my $topicObj = $theDB->fastget($thisTopic) || '';
+###############################################################################
+sub restDBDUMP {
+  my $session = shift;
+
+  my $web = $session->{webName};
+  my $topic = $session->{topicName};
+
+  return dbDump($web, $topic);
+}
+
+###############################################################################
+sub dbDump {
+  my ($web, $topic) = @_;
+
+  my $theDB = getDB($web);
+
+  my $topicObj = $theDB->fastget($topic) || '';
   unless ($topicObj) {
-    return inlineError("$thisWeb.$thisTopic not found");
+    return inlineError("$web.$topic not found");
   }
   my $result = "\n<noautolink>\n";
-  $result .= "---++ [[$thisWeb.$thisTopic]]\n$topicObj\n";
+  $result .= "---++ [[$web.$topic]]\n$topicObj\n";
 
   # read all keys
   $result .= "<table class=\"foswikiTable\">\n";
@@ -897,7 +949,7 @@ sub handleATTACHMENTS {
     next if $theMinDate && $date < $theMinDate;
     next if $theMaxDate && $date > $theMaxDate;
 
-    my $user = $attachment->fastget('author') || 'UnknownUser';
+    my $user = $attachment->fastget('user') || $attachment->fastget('author') || 'UnknownUser';
     if ($Foswiki::Plugins::VERSION >= 1.2) { # new Foswikis
       $user = Foswiki::Func::getWikiName($user);
     }

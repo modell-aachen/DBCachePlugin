@@ -22,6 +22,7 @@ use Foswiki::Contrib::DBCacheContrib ();
 use Foswiki::Contrib::DBCacheContrib::Search ();
 use Foswiki::Plugins::DBCachePlugin ();
 use Foswiki::Attrs ();
+use Foswiki::Time ();
 use Error qw(:try);
 
 use constant DEBUG => 0; # toggle me
@@ -68,18 +69,24 @@ sub load {
 }
 
 ###############################################################################
+# clean up text: undo ALIAS markup from AliasPlugin
+#sub readTopicLine {
+#  my ( $this, $topic, $meta, $line, $data ) = @_;
+#}
+
+
+###############################################################################
+# WARNING: this breaks on Archivists that are not file-based
 sub _getCacheFile {
   my $this = shift;
 
-  my $workDir = Foswiki::Func::getWorkArea('DBCacheContrib');
-  my $web = $this->{web};
-  $web =~ s/\./\//go;
-  my $cacheFile = "$workDir/$web/$this->{_cachename}";
-
+  my $cacheFile = $this->{archivist}->{_file};
   writeDebug("cacheFile=$cacheFile");
-  #die "cacheFile $cacheFile not found" unless -f $cacheFile;
+  return $cacheFile if -f $cacheFile;
 
-  return $cacheFile;
+  writeDebug("oops, cacheFile $cacheFile not found");
+
+  return undef;
 }
 
 ###############################################################################
@@ -87,6 +94,7 @@ sub _getModificationTime {
   my $this = shift;
 
   my $filename = $this->_getCacheFile();
+  return 0 unless $filename;
   my @stat = stat($filename);
 
   return $stat[9] || $stat[10] || 0;
@@ -97,6 +105,7 @@ sub touch {
   my $this = shift;
 
   my $filename = $this->_getCacheFile();
+  return 0 unless $filename;
 
   return utime undef, undef, $filename;
 }
@@ -124,7 +133,7 @@ sub onReload {
     # however we still check for odd topics that did not make it into the cache
     # for some odd reason
     unless ($topic) {
-      print STDERR "ERROR: trying to load topic '$topicName' in web '$this->{web}' but it wasn't found in the cache\n";
+      #print STDERR "trying to load topic '$topicName' in web '$this->{web}' but it wasn't found in the cache\n";
       next;
     }
 
@@ -248,6 +257,8 @@ sub getFormField {
   return '' unless $form;
 
   $form = $topicObj->fastget($form);
+  return '' unless $form;
+
   my $formfield = $form->fastget($theFormField) || '';
   return urlDecode($formfield);
 }
@@ -303,6 +314,9 @@ sub dbQuery {
       # TODO: re-code DBCacheContrib to add '   * Set ALLOW... perms into the
       # META 'preferences', then recode to just use that.
       my $cachedText = $topicObj->fastget('text');
+
+      #die "no text in $topicName\n" unless defined $cachedText;# never reach
+
       my $topicHasPerms = $cachedText =~ /(ALLOW|DENY)/;
       my $cachedPrefsMap = $topicObj->fastget('preferences');
       if (defined($cachedPrefsMap)) {
@@ -329,15 +343,18 @@ sub dbQuery {
           $doNumericalSort = 0;
         } elsif ($theSort =~ /^created/) {
           $sorting{$topicName} = $topicObj->fastget('createdate');
-        } elsif ($theSort =~ /^modified/) {
+        } elsif ($theSort =~ /^(modified|info\.date)/) {
           my $info = $topicObj->fastget('info');
-          $sorting{$topicName} = $info ? $topicObj->fastget('info')->fastget('date') : 0;
+          $sorting{$topicName} = $info ? $info->fastget('date') : 0;
         } elsif ($theSort ne 'off') {
-          $theSort =~ s/\$percnt/\%/go;
-          $theSort =~ s/\$nop//go;
-          $theSort =~ s/\$n/\n/go;
-          $theSort =~ s/\$dollar/\$/go;
-          $sorting{$topicName} = $this->expandPath($topicObj, $theSort);
+          my $format = $theSort;
+          $format =~ s/\$web/$this->{web}/g;
+          $format =~ s/\$topic/$topicName/g;
+          $format =~ s/\$percnt/\%/go;
+          $format =~ s/\$nop//go;
+          $format =~ s/\$n/\n/go;
+          $format =~ s/\$dollar/\$/go;
+          $sorting{$topicName} = $this->expandPath($topicObj, $format);
           $doNumericalSort = 0 
             if ($doNumericalSort == 1) && !($sorting{$topicName} =~ /^[+-]?\d+(\.\d+)?$/);
         }
@@ -389,10 +406,27 @@ sub expandPath {
     return '' unless defined $result2 && $result2 ne '';
     return $result1 . $result2;
   }
+  if ($thePath =~ /^d2n\((.*)\)$/) {
+    my $result = $this->expandPath($theRoot, $1);
+    return 0 unless defined $result;
+    return Foswiki::Time::parseTime($result, 1);
+  }
+  if ($thePath =~ /^uc\((.*)\)$/) {
+    my $result = $this->expandPath($theRoot, $1);
+    return uc($result);
+  }
+  if ($thePath =~ /^lc\((.*)\)$/) {
+    my $result = $this->expandPath($theRoot, $1);
+    return lc($result);
+  }
   if ($thePath =~ /^'([^']*)'$/) {
 
     #print STDERR "DEBUG: result=$1\n";
     return $1;
+  }
+  if ($thePath =~ /^[+-]?\d+(\.\d+)?$/) {
+    #print STDERR "DEBUG: result=$thePath\n";
+    return $thePath;
   }
   if ($thePath =~ /^(.*?) or (.*)$/) {
     my $first = $1;
@@ -401,7 +435,6 @@ sub expandPath {
     return $result if (defined $result && $result ne '');
     return $this->expandPath($theRoot, $tail);
   }
-
   if ($thePath =~ m/^(\w+)(.*)$/o) {
     my $first = $1;
     my $tail = $2;
@@ -440,6 +473,7 @@ sub expandPath {
 
   if ($thePath =~ /^%/) {
     $thePath = &Foswiki::Func::expandCommonVariables($thePath, '', $this->{web});
+    $thePath =~ s/^%/<nop>%/o;
     return $this->expandPath($theRoot, $thePath);
   }
 
