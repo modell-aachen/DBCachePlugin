@@ -463,7 +463,7 @@ This option only has an effect using speedy/perperl or fastcgi setups.
                   exclude autoinc pattern in TOPICTITLE; \
                   properly combine header, body and footer in DBQUERY to support CALC; \
                   added =split= and =casesensitive= to DBSTATS; \
-                  added support for standard escapes in DBQUERY's =sort=; \ 
+                  added support for standard escapes in DBQUERY's =sort=; \
                   added =$d2n()= , =$uc()=, =$lc()= |
 |  02 Jul 2009: | optimed cache maintenance cycles by making use of new =loadTopic()= api in !DBCacheContrib |
 |  28 Jun 2009: | final detwikification; added compatibility hack for current Foswiki/trunk |
