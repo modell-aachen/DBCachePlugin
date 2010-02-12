@@ -454,11 +454,12 @@ This option only has an effect using speedy/perperl or fastcgi setups.
    * Set SHORTDESCRIPTION = Lightweight frontend to the <nop>DBCacheContrib
 -->
 |  Author: | Michael Daum |
-|  Copyright &copy;: | 2005-2009, Michael Daum http://michaeldaumconsulting.com |
+|  Copyright &copy;: | 2005-2010, Michael Daum http://michaeldaumconsulting.com |
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  12 Feb 2010: | ATTACHMENTS can now list old revisions of an attachment |
 |  17 Nov 2009: | fixed incremental cache updates; \
                   exclude autoinc pattern in TOPICTITLE; \
                   properly combine header, body and footer in DBQUERY to support CALC; \

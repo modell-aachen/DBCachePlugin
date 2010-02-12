@@ -1,6 +1,6 @@
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright (C) 2005-2009 Michael Daum http://michaeldaumconsulting.com
+# Copyright (C) 2005-2010 Michael Daum http://michaeldaumconsulting.com
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -356,7 +356,8 @@ sub dbQuery {
           $format =~ s/\$dollar/\$/go;
           $sorting{$topicName} = $this->expandPath($topicObj, $format);
           $doNumericalSort = 0 
-            if ($doNumericalSort == 1) && !($sorting{$topicName} =~ /^[+-]?\d+(\.\d+)?$/);
+            if ($doNumericalSort == 1) && $sorting{$topicName} && !($sorting{$topicName} =~ /^[+-]?\d+(\.\d+)?$/);
+          #print STDERR "topicName=$topicName - sorting=$sorting{$topicName} - doNumericalSort=$doNumericalSort\n";
         }
       }
     }
@@ -367,7 +368,7 @@ sub dbQuery {
     if ($theSort ne 'off') {
       if ($doNumericalSort == 1) {
         @topicNames =
-          sort { $sorting{$a} <=> $sorting{$b} } @topicNames;
+          sort { ($sorting{$a}||0) <=> ($sorting{$b}||0) } @topicNames;
       } else {
         @topicNames =
           sort { $sorting{$a} cmp $sorting{$b} } @topicNames;
@@ -409,7 +410,7 @@ sub expandPath {
   if ($thePath =~ /^d2n\((.*)\)$/) {
     my $result = $this->expandPath($theRoot, $1);
     return 0 unless defined $result;
-    return Foswiki::Time::parseTime($result, 1);
+    return Foswiki::Time::parseTime($result);
   }
   if ($thePath =~ /^uc\((.*)\)$/) {
     my $result = $this->expandPath($theRoot, $1);

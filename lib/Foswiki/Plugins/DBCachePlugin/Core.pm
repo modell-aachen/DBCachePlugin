@@ -1,6 +1,6 @@
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright (C) 2005-2009 Michael Daum http://michaeldaumconsulting.com
+# Copyright (C) 2005-2010 Michael Daum http://michaeldaumconsulting.com
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,24 +16,9 @@ package Foswiki::Plugins::DBCachePlugin::Core;
 
 use strict;
 use vars qw( 
-  $TranslationToken %webDB %webDBIsModified $wikiWordRegex $webNameRegex
+  $TranslationToken $TranslationToken2 %webDB %webDBIsModified $wikiWordRegex $webNameRegex
   $defaultWebNameRegex $linkProtocolPattern $tagNameRegex
-  $baseWeb $baseTopic %MON2NUM $dbQueryCurrentWeb $doRefresh
-);
-
-%MON2NUM = (
-  Jan => 0,
-  Feb => 1,
-  Mar => 2,
-  Apr => 3,
-  May => 4,
-  Jun => 5,
-  Jul => 6,
-  Aug => 7,
-  Sep => 8,
-  Oct => 9,
-  Nov => 10,
-  Dec => 11
+  $baseWeb $baseTopic $dbQueryCurrentWeb $doRefresh
 );
 
 use constant DEBUG => 0; # toggle me
@@ -42,9 +27,10 @@ use Foswiki::Contrib::DBCacheContrib ();
 use Foswiki::Contrib::DBCacheContrib::Search ();
 use Foswiki::Plugins::DBCachePlugin::WebDB ();
 use Foswiki::Sandbox ();
-use Time::Local;
+use Foswiki::Time ();
 
 $TranslationToken = "\0"; # from Foswiki.pm
+$TranslationToken2 = "\1"; 
 
 ###############################################################################
 sub writeDebug {
@@ -106,17 +92,20 @@ sub renderWikiWordHandler {
 
 ###############################################################################
 sub afterSaveHandler {
-  my ($web, $topic) = @_;
+  my ($web, $topic, $newWeb, $newTopic) = @_;
 
   my $doFullUpdate = $Foswiki::cfg{DBCacheContrib}{AlwaysUpdateCache};
   $doFullUpdate = 1 unless defined $doFullUpdate;
 
+  $newWeb ||= $baseWeb;
+  $newTopic ||= $baseTopic;
+
   if ($doFullUpdate) {
-    my $db = getDB($baseWeb);
+    my $db = getDB($newWeb);
     $db->touch();
 
     # move/rename from one web to the other
-    if ($baseWeb ne $web) {
+    if ($newWeb ne $web) {
       $db = getDB($web); 
       $db->touch();
     }
@@ -125,15 +114,15 @@ sub afterSaveHandler {
     $db->loadTopic($web, $topic);
 
     # move/rename 
-    if ($baseWeb eq $web) {
-      if ($topic ne $baseTopic) {
-        $db->loadTopic($web, $baseTopic)
+    if ($newWeb eq $web) {
+      if ($topic ne $newTopic) {
+        $db->loadTopic($web, $newTopic)
       }
     } else { # crossing webs
-      $db = getDB($baseWeb); 
-      $db->loadTopic($baseWeb, $topic);
-      if ($topic ne $baseTopic) {
-        $db->loadTopic($baseWeb, $baseTopic)
+      $db = getDB($newWeb); 
+      $db->loadTopic($newWeb, $topic);
+      if ($topic ne $newTopic) {
+        $db->loadTopic($newWeb, $newTopic)
       }
     }
   }
@@ -863,9 +852,9 @@ sub handleATTACHMENTS {
   $theAutoAttached = 1 if $theAutoAttached =~ /^(yes|on)$/o;
   $theAutoAttached = 2 if $theAutoAttached eq 'undef';
   my $theMinDate = $params->{mindate};
-  $theMinDate = parseTime($theMinDate) if $theMinDate;
+  $theMinDate = Foswiki::Time::parseTime($theMinDate) if $theMinDate;
   my $theMaxDate = $params->{maxdate};
-  $theMaxDate = parseTime($theMaxDate) if $theMaxDate;
+  $theMaxDate = Foswiki::Time::parseTime($theMaxDate) if $theMaxDate;
   my $theMinSize = $params->{minsize} || 0;
   my $theMaxSize = $params->{maxsize} || 0;
   my $theUser = $params->{user} || '.*';
@@ -971,18 +960,10 @@ sub handleATTACHMENTS {
     my $comment = $attachment->fastget('comment') || '';
     next unless $comment =~ /^($theComment)$/;
 
-    my $fileType = $session->mapToIconFileName($name); # SMELL: no func api
-    #writeDebug("fileType=$fileType");
-    my $iconUrl = $session->getIconUrl(0, $fileType);
-    #writeDebug("fileType=$fileType, iconUrl=$iconUrl");
+    my $iconUrl = '%ICONURL{"'.$name.'" alt="else"}%';
+    my $icon = '%ICON{"'.$name.'" alt="else"}%';
 
     my $version = $attachment->fastget('version') || 1;
-
-    my $icon = 
-      '<img src="'.$iconUrl.'" '.
-      'width="16" height="16" align="top" '.
-      'alt="'.$fileType.'" '.
-      'border="0" />';
 
     # actions
     my $webDavUrl = '%WIKIDAVPUBURL%/'.$thisWeb.'/'.$thisTopic.'/'.$name;
@@ -1009,7 +990,19 @@ sub handleATTACHMENTS {
       '<a rel="nofollow" href="'.$deleteUrl.'" '.
       'title="%MAKETEXT{"delete [_1]" args="<nop>'.$name.'"}%">'.
       '%MAKETEXT{"delete"}%</a>';
-    
+
+    my $oldVersions = '';
+    if ($theFormat =~ /\$oldversions/ && $version > 1) {
+      my @oldVersions;
+      for (my $i = $version-1; $i > 0; $i--) {
+        my ($date, $user, $rev, $comment) = Foswiki::Func::getRevisionInfo($thisWeb, $thisTopic, $i, $name);
+        $date = formatTime($date);
+        $user = "$userWeb.$userTopic";
+        push @oldVersions, "$date;$user;$rev;$comment";
+      }
+      $oldVersions = join("\n", @oldVersions);
+    }
+
     $index++;
     my $text = $theFormat;
     $text =~ s/\$date\(([^\)]+)\)/_formatTile($date, $1)/ge;
@@ -1023,7 +1016,6 @@ sub handleATTACHMENTS {
       'delete'=>$deleteAction,
       'deleteUrl'=>$deleteUrl,
       'icon'=>$icon,
-      'type'=>$fileType,
       'iconUrl'=>$iconUrl,
       'attr'=>$attr,
       'autoattached'=>$autoattached,
@@ -1042,6 +1034,7 @@ sub handleATTACHMENTS {
       'web'=>$thisWeb,
       'topic'=>$thisTopic,
       'version'=>$version,
+      'oldversions'=>$oldVersions,
     );
 
     push @result, $text if $text;
@@ -1297,14 +1290,14 @@ sub fixInclude {
   # '[[TopicName][...]]' to '[[Web.TopicName][...]]'
   $_[0] =~ s/\[\[([^\]]+)\]\[([^\]]+)\]\]/&fixIncludeLink($thisWeb, $1, $2)/geo;
 
-  $_[0] = $session->{renderer}->takeOutBlocks($_[0], 'noautolink', $removed);
+  $_[0] = takeOutBlocks($_[0], 'noautolink', $removed);
 
   # 'TopicName' to 'Web.TopicName'
   $_[0] =~ s/(^|[\s(])($webNameRegex\.$wikiWordRegex)/$1$TranslationToken$2/go;
   $_[0] =~ s/(^|[\s(])($wikiWordRegex)/$1\[\[$thisWeb\.$2\]\[$2\]\]/go;
   $_[0] =~ s/(^|[\s(])$TranslationToken/$1/go;
 
-  $session->{renderer}->putBackBlocks( \$_[0], $removed, 'noautolink');
+  putBackBlocks( \$_[0], $removed, 'noautolink');
 }
 
 ###############################################################################
@@ -1335,7 +1328,7 @@ sub expandVariables {
   foreach my $key (keys %params) {
     my $val = $params{$key};
     next unless defined $val;
-    if($theFormat =~ s/\$$key\b/$params{$key}/g) {
+    if($theFormat =~ s/\$$key\b/${TranslationToken2}$params{$key}${TranslationToken2}/g) {
       #writeDebug("expanding $key->$params{$key}");
     }
   }
@@ -1348,85 +1341,9 @@ sub expandVariables {
   $theFormat =~ s/\$trunc\((.*?),\s*(\d+)\)/substr($1,0,$2)/ges;
   $theFormat =~ s/\$t\b/\t/go;
   $theFormat =~ s/\$dollar/\$/go;
+  $theFormat =~ s/${TranslationToken2}//go;
 
   return $theFormat;
-}
-
-###############################################################################
-# our own time format parser
-sub parseTime {
-  my $date = shift;
-
-  my $sec = 0; my $min = 0; my $hour = 0; my $day = 1; my $mon = 0; my $year = 0;
-
-  # "31 Dec 2003 - 23:59", "31-Dec-2003 - 23:59", "31 Dec 2003 - 23:59 - any suffix"
-  if($date =~ m|([0-9]{1,2})[-\s/]+([A-Z][a-z][a-z])[-\s/]+([0-9]{4})[-\s/]+([0-9]{1,2}):([0-9]{1,2})|) {
-    $day = $1;
-    $mon = $MON2NUM{$2} || 0;
-    $year = $3 - 1900;
-    $hour = $4;
-    $min = $5;
-  }
-
-  # "31 Dec 2003", "31 Dec 03", "31-Dec-2003", "31/Dec/2003"
-  elsif($date =~ m|([0-9]{1,2})[-\s/]+([A-Z][a-z][a-z])[-\s/]+([0-9]{2,4})|) {
-    $day = $1;
-    $mon = $MON2NUM{$2} || 0;
-    $year = $3;
-    $year += 100 if $year < 80; # "05"   --> "105" (leave "99" as is)
-    $year -= 1900 if $year >= 1900; # "2005" --> "105"
-  }
-
-  # "2003/12/31 23:59:59", "2003-12-31-23-59-59", "2003.12.31.23.59.59"
-  elsif($date =~ m|([0-9]{4})[-/\.]([0-9]{1,2})[-/\.]([0-9]{1,2})[-/\.\,\s]+([0-9]{1,2})[-\:/\.]([0-9]{1,2})[-\:/\.]([0-9]{1,2})|) {
-    $year = $1 - 1900;
-    $mon = $2 - 1;
-    $day = $3;
-    $hour = $4;
-    $min = $5;
-    $sec = $6;
-  }
-
-  # "2003/12/31 23:59", "2003-12-31-23-59", "2003.12.31.23.59"
-  elsif($date =~ m|([0-9]{4})[-/\.]([0-9]{1,2})[-/\.]([0-9]{1,2})[-/\.\,\s]+([0-9]{1,2})[-\:/\.]([0-9]{1,2})|) {
-    $year = $1 - 1900;
-    $mon = $2 - 1;
-    $day = $3;
-    $hour = $4;
-    $min = $5;
-  }
-
-  # "2003/12/31", "2003-12-31"
-  elsif( $date =~ m|([0-9]{4})[-/]([0-9]{1,2})[-/]([0-9]{1,2})| ) {
-    $year = $1 - 1900;
-    $mon = $2 - 1;
-    $day = $3;
-  }
-
-  # "31.12.2001"
-  elsif( $date =~ m|([0-9]{1,2})\.([0-9]{1,2})\.([0-9]{4})|) {
-    $day = $1;
-    $mon = $2 - 1;
-    $year = $3 - 1900;
-  }
-
-  # "12/31/2003", "12/31/03", "12-31-2003"
-  # (shh, don't tell anyone that we support ambiguous American dates, my boss asked me to)
-  elsif( $date =~ m|([0-9]{1,2})[-/]([0-9]{1,2})[-/]([0-9]{2,4})| ) {
-    $year = $3;
-    $mon = $1 - 1;
-    $day = $2;
-    $year += 100 if $year < 80; # "05"   --> "105" (leave "99" as is)
-    $year -= 1900 if  $year >= 1900; # "2005" --> "105"
-  }
-
-  else {
-    print STDERR "WARNING: unsupported date format '$date'\n";
-    return 0;
-  }
-
-  return timegm($sec, $min, $hour, $day, $mon, $year) if $date =~ /gmt/i;
-  return timelocal($sec, $min, $hour, $day, $mon, $year);
 }
 
 ###############################################################################
@@ -1437,7 +1354,7 @@ sub formatTime {
   $time ||= 0;
 
   unless ($time =~ /^\d+$/) {
-    $time = parseTime($time);
+    $time = Foswiki::Time::parseTime($time);
   }
 
   return Foswiki::Func::formatTime($time, $format)
@@ -1540,6 +1457,20 @@ sub extractPattern {
 ###############################################################################
 sub inlineError {
   return "<div class=\"foswikiAlert\">$_[0]</div>";
+}
+
+###############################################################################
+# compatibility wrapper 
+sub takeOutBlocks {
+  return Foswiki::takeOutBlocks(@_) if defined &Foswiki::takeOutBlocks;
+  return $Foswiki::Plugins::SESSION->{renderer}->takeOutBlocks(@_);
+}
+
+###############################################################################
+# compatibility wrapper 
+sub putBackBlocks {
+  return Foswiki::putBackBlocks(@_) if defined &Foswiki::putBackBlocks;
+  return $Foswiki::Plugins::SESSION->{renderer}->putBackBlocks(@_);
 }
 
 

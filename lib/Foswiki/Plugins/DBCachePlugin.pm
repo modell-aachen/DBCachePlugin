@@ -1,6 +1,6 @@
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright (C) 2005-2009 Michael Daum http://michaeldaumconsulting.com
+# Copyright (C) 2005-2010 Michael Daum http://michaeldaumconsulting.com
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -27,7 +27,7 @@ use vars qw(
 );
 
 $VERSION = '$Rev$';
-$RELEASE = '3.20';
+$RELEASE = '3.40';
 $NO_PREFS_IN_TOPIC = 1;
 $SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 
@@ -122,6 +122,15 @@ sub afterUploadHandler {
   my $topic = $meta->topic;
   initCore();
   return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler($web, $topic);
+}
+
+###############################################################################
+# Foswiki::Plugins::VERSION >= 2.1
+sub afterRenameHandler {
+  my ($web, $topic, undef, $newWeb, $newTopic) = @_;
+
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler($web, $topic, $newWeb, $newTopic);
 }
 
 ###############################################################################
