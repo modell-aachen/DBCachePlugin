@@ -15,11 +15,21 @@
 package Foswiki::Plugins::DBCachePlugin::Core;
 
 use strict;
-use vars qw( 
-  $TranslationToken $TranslationToken2 %webDB %webDBIsModified $wikiWordRegex $webNameRegex
-  $defaultWebNameRegex $linkProtocolPattern $tagNameRegex
-  $baseWeb $baseTopic $dbQueryCurrentWeb $doRefresh
-);
+use warnings;
+
+our %webDB;
+our %webDBIsModified;
+our $wikiWordRegex;
+our $webNameRegex;
+our $defaultWebNameRegex;
+our $linkProtocolPattern;
+our $tagNameRegex;
+our $baseWeb;
+our $baseTopic;
+our $dbQueryCurrentWeb;
+our $doRefresh;
+our $TranslationToken = "\0";
+our $TranslationToken2 = "\1"; 
 
 use constant DEBUG => 0; # toggle me
 
@@ -29,12 +39,9 @@ use Foswiki::Plugins::DBCachePlugin::WebDB ();
 use Foswiki::Sandbox ();
 use Foswiki::Time ();
 
-$TranslationToken = "\0"; # from Foswiki.pm
-$TranslationToken2 = "\1"; 
-
 ###############################################################################
 sub writeDebug {
-  #&Foswiki::Func::writeDebug('- DBCachePlugin - '.$_[0]) if DEBUG;
+  #Foswiki::Func::writeDebug('- DBCachePlugin - '.$_[0]) if DEBUG;
   print STDERR "- DBCachePlugin::Core - $_[0]\n" if DEBUG;
 }
 
@@ -45,20 +52,26 @@ sub init {
   %webDBIsModified = ();
 
   my $query = Foswiki::Func::getCgiQuery();
-  my $memoryCache = $Foswiki::cfg{DBCache}{MemoryCache};
+  my $memoryCache = $Foswiki::cfg{DBCachePlugin}{MemoryCache};
+
+  # deprecated
+  $memoryCache = $Foswiki::cfg{DBCache}{MemoryCache} unless defined $memoryCache;
   $memoryCache = 1 unless defined $memoryCache;
 
-  if (!$memoryCache) {
-    %webDB = ();
-  } else {
+  if ($memoryCache) {
     $doRefresh = $query->param('refresh') || '';
-    if ( $doRefresh =~ /^(on|dbcache)$/ ) {
+    if ($doRefresh eq 'this') {
       $doRefresh = 1;
+    }
+    elsif ($doRefresh =~ /^(on|dbcache)$/) {
+      $doRefresh = 2;
       %webDB = ();
-      writeDebug("found refresh=on in urlparam");
+      writeDebug("found refresh in urlparam");
     } else {
       $doRefresh = 0;
     }
+  } else {
+    %webDB = ();
   }
 
   $wikiWordRegex = Foswiki::Func::getRegularExpression('wikiWordRegex');
@@ -313,7 +326,7 @@ sub findTopicMethod {
 
   return undef unless $theObject;
 
-  my ($thisWeb, $thisObject) = &Foswiki::Func::normalizeWebTopicName($theWeb, $theObject);
+  my ($thisWeb, $thisObject) = Foswiki::Func::normalizeWebTopicName($theWeb, $theObject);
 
   #writeDebug("object web=$thisWeb, topic=$thisObject");
 
@@ -406,7 +419,7 @@ sub handleDBCALL {
   }
 
   my $thisWeb;
-  ($thisWeb, $thisTopic) = &Foswiki::Func::normalizeWebTopicName($baseWeb, $thisTopic);
+  ($thisWeb, $thisTopic) = Foswiki::Func::normalizeWebTopicName($baseWeb, $thisTopic);
 
   # find the actual implementation
   if ($theObject) {
@@ -694,7 +707,7 @@ sub handleDBSTATS {
       @{$record->{keyList}};
     $text = $theSep if $result;
     $text .= $theFormat;
-    $result .= &expandVariables($text, 
+    $result .= expandVariables($text, 
       $thisWeb,
       $thisTopic,
       'web'=>$thisWeb,
@@ -707,18 +720,18 @@ sub handleDBSTATS {
       'key5'=>$key5,
       'count'=>$record->{count}, 
       'index'=>$index,
-      'min'=>$min,
-      'max'=>$max,
-      'sum'=>$sum,
-      'mean'=>$mean,
-      'keys'=>$numkeys,
     );
 
     last if $theLimit && $index == $theLimit;
   }
-  $theHeader = &expandVariables($theHeader, $thisWeb, $thisTopic);
-  $theFooter = &expandVariables($theFooter, $thisWeb, $thisTopic);
-  $result = &Foswiki::Func::expandCommonVariables($theHeader.$result.$theFooter, $thisTopic, $thisWeb);
+  $result = expandVariables($theHeader.$result.$theFooter, $thisWeb, $thisTopic,
+    'min'=>$min,
+    'max'=>$max,
+    'sum'=>$sum,
+    'mean'=>$mean,
+    'keys'=>$numkeys,
+  );
+  $result = Foswiki::Func::expandCommonVariables($result, $thisTopic, $thisWeb);
 
   return $result;
 }
@@ -756,15 +769,16 @@ sub dbDump {
 
   my $topicObj = $theDB->fastget($topic) || '';
   unless ($topicObj) {
-    return inlineError("$web.$topic not found");
+    return inlineError("DBCachePlugin: $web.$topic not found");
   }
   my $result = "\n<noautolink>\n";
   $result .= "---++ [[$web.$topic]]\n$topicObj\n";
 
   # read all keys
-  $result .= "<table class=\"foswikiTable\">\n";
+  $result .= "<table class='foswikiTable'>\n";
   foreach my $key (sort $topicObj->getKeys()) {
     my $value = $topicObj->fastget($key);
+    $value = 'undef' unless defined $value;
     $result .= "<tr><th>$key</th>\n<td><verbatim>\n$value\n</verbatim></td></tr>\n";
   }
   $result .= "</table>\n";
@@ -772,7 +786,7 @@ sub dbDump {
   # read info
   my $topicInfo = $topicObj->fastget('info');
   $result .= "<p/>\n---++ Info = $topicInfo\n";
-  $result .= "<table class=\"foswikiTable\">\n";
+  $result .= "<table class='foswikiTable'>\n";
   foreach my $key (sort $topicInfo->getKeys()) {
     my $value = $topicInfo->fastget($key);
     $result .= "<tr><th>$key</th><td>$value</td></tr>\n" if defined $value;
@@ -783,7 +797,7 @@ sub dbDump {
   my $topicForm = $topicObj->fastget('form');
   if ($topicForm) {
     $result .= "<p/>\n---++ Form = $topicForm\n";
-    $result .= "<table class=\"foswikiTable\">\n";
+    $result .= "<table class='foswikiTable'>\n";
     $topicForm = $topicObj->fastget($topicForm);
     foreach my $key (sort $topicForm->getKeys()) {
       my $value = $topicForm->fastget($key);
@@ -796,7 +810,7 @@ sub dbDump {
   my $attachments = $topicObj->fastget('attachments');
   if ($attachments) {
     $result .= "<p/>\n---++ Attachments = $attachments\n";
-    $result .= "<table class=\"foswikiTable\">\n";
+    $result .= "<table class='foswikiTable'>\n";
     foreach my $attachment (sort $attachments->getValues()) {
       $result .= "<tr><th valign='top'>".$attachment->fastget('name')."</th>";
       $result .= '<td><table>';
@@ -814,7 +828,7 @@ sub dbDump {
   my $prefs = $topicObj->fastget('preferences');
   if ($prefs) {
     $result .= "<p/>\n---++ Preferences = $prefs\n";
-    $result .= "<table class=\"foswikiTable\">\n";
+    $result .= "<table class='foswikiTable'>\n";
     $result .= '<tr><th>type</th><th>name</th><th>title</th><th>value</th><th>_up</th><th>_web</th></tr>'."\n";
     foreach my $pref (sort {$a->fastget('name') cmp $b->fastget('name')} $prefs->getValues()) {
       $result .= "<tr><td>".$pref->fastget('type')."</td>\n";
@@ -826,6 +840,24 @@ sub dbDump {
       $result .= "</tr>\n";
     }
     $result .= "</table>\n";
+  }
+
+  # read comments
+  my $comments = $topicObj->fastget('comments');
+  if ($comments) {
+    $result .= "<p/>\n---++ Comments = $comments\n";
+    $result .= "<table class='foswikiTable'>\n";
+    foreach my $comment (sort $comments->getValues()) {
+      $result .= "<tr><th valign='top'>".$comment->fastget('name')."</th>";
+      $result .= '<td><table>';
+      foreach my $key (sort $comment->getKeys()) {
+        next if $key eq 'name';
+        my $value = $comment->fastget($key);
+        $result .= "<tr><th>$key</th><td>$value</td></tr>\n" if defined $value;
+      }
+      $result .= '</table></td>';
+    }
+    $result .= "</tr></table>\n";
   }
 
   return $result."\n</noautolink>\n";
@@ -882,7 +914,7 @@ sub handleATTACHMENTS {
   my $topicObj = $theDB->fastget($thisTopic) || '';
   unless ($topicObj) {
     return '' if $theWarn eq 'off';
-    return inlineError("$thisWeb.$thisTopic not found");
+    return inlineError("DBCachePlugin: $thisWeb.$thisTopic not found");
   }
 
   # sort attachments
@@ -1059,7 +1091,7 @@ sub handleDBRECURSE {
   my $thisWeb = $params->{web} || $baseWeb;
 
   ($thisWeb, $thisTopic) = 
-    &Foswiki::Func::normalizeWebTopicName($thisWeb, $thisTopic);
+    Foswiki::Func::normalizeWebTopicName($thisWeb, $thisTopic);
 
   $params->{format} ||= '   $indent* [[$web.$topic][$topic]]';
   $params->{single} ||= $params->{format};
@@ -1214,7 +1246,7 @@ sub getDB {
   
   #writeDebug("called getDB($theWeb)");
 
-  # We do not need to reload the cache if we run on mod_perl or speedy_cgi or
+  # We do not need to reload the cache if we run on mod_perl or fastcgi or
   # whatever perl accelerator that keeps our global variables and 
   # the database wasn't modified!
 
@@ -1248,7 +1280,7 @@ sub getDB {
     writeDebug("loading new webdb for '$theWeb($isModified) '");
     #writeDebug("impl='$impl'");
     $webDB{$theWeb} = new $impl($theWeb);
-    $webDB{$theWeb}->load($doRefresh);
+    $webDB{$theWeb}->load($doRefresh, $baseWeb, $baseTopic);
     $webDBIsModified{$theWeb} = 0;
   }
 
@@ -1286,9 +1318,9 @@ sub fixInclude {
 
   # Must handle explicit [[]] before noautolink
   # '[[TopicName]]' to '[[Web.TopicName][TopicName]]'
-  $_[0] =~ s/\[\[([^\]]+)\]\]/&fixIncludeLink($thisWeb, $1)/geo;
+  $_[0] =~ s/\[\[([^\]]+)\]\]/fixIncludeLink($thisWeb, $1)/geo;
   # '[[TopicName][...]]' to '[[Web.TopicName][...]]'
-  $_[0] =~ s/\[\[([^\]]+)\]\[([^\]]+)\]\]/&fixIncludeLink($thisWeb, $1, $2)/geo;
+  $_[0] =~ s/\[\[([^\]]+)\]\[([^\]]+)\]\]/fixIncludeLink($thisWeb, $1, $2)/geo;
 
   $_[0] = takeOutBlocks($_[0], 'noautolink', $removed);
 
@@ -1332,12 +1364,12 @@ sub expandVariables {
       #writeDebug("expanding $key->$params{$key}");
     }
   }
-  $theFormat =~ s/\$percnt/\%/go;
+  $theFormat =~ s/\$perce?nt/\%/go;
   $theFormat =~ s/\$nop//g;
   $theFormat =~ s/\$n/\n/go;
-  $theFormat =~ s/\$flatten\((.*?)\)/&flatten($1)/ges;
-  $theFormat =~ s/\$rss\((.*?)\)/&rss($1, $web, $topic)/ges;
-  $theFormat =~ s/\$encode\((.*?)\)/&entityEncode($1)/ges;
+  $theFormat =~ s/\$flatten\((.*?)\)/flatten($1)/ges;
+  $theFormat =~ s/\$rss\((.*?)\)/rss($1, $web, $topic)/ges;
+  $theFormat =~ s/\$encode\((.*?)\)/entityEncode($1)/ges;
   $theFormat =~ s/\$trunc\((.*?),\s*(\d+)\)/substr($1,0,$2)/ges;
   $theFormat =~ s/\$t\b/\t/go;
   $theFormat =~ s/\$dollar/\$/go;
@@ -1353,9 +1385,11 @@ sub formatTime {
 
   $time ||= 0;
 
-  unless ($time =~ /^\d+$/) {
+  unless ($time =~ /^-?\d+$/) {
     $time = Foswiki::Time::parseTime($time);
   }
+
+  $time ||= 0;
 
   return Foswiki::Func::formatTime($time, $format)
 }
@@ -1456,7 +1490,7 @@ sub extractPattern {
 
 ###############################################################################
 sub inlineError {
-  return "<div class=\"foswikiAlert\">$_[0]</div>";
+  return "<div class='foswikiAlert'>$_[0]</div>";
 }
 
 ###############################################################################

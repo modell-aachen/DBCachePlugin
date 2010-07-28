@@ -27,7 +27,7 @@ use vars qw(
 );
 
 $VERSION = '$Rev$';
-$RELEASE = '3.40';
+$RELEASE = '3.50';
 $NO_PREFS_IN_TOPIC = 1;
 $SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 
@@ -108,7 +108,7 @@ sub afterSaveHandler {
 sub afterAttachmentSaveHandler {
   #my ($attrHashRef, $topic, $web) = @_;
   return if $Foswiki::Plugins::VERSION >= 2.1 || 
-    $Foswiki::cfg{DBCache}{UseUploadHandler}; # set this to true if you backported the afterUploadHandler
+    $Foswiki::cfg{DBCachePlugin}{UseUploadHandler}; # set this to true if you backported the afterUploadHandler
 
   initCore();
   return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler($_[2], $_[1]);

@@ -53,27 +53,22 @@ sub writeDebug {
 ###############################################################################
 # cache time we loaded the cacheFile
 sub load {
-  my $this = shift;
+  my ($this, $refresh, $web, $topic) = @_;
 
-  writeDebug("called load() for $this->{web}");
+  writeDebug("called load() for $this->{web}, refresh=$refresh");
 
-  # first load
-  my ($readFromCache, $readFromFile, $removed) = $this->SUPER::load(@_);
+  if ($refresh == 1) {
+    # refresh a single topic
+    $this->loadTopic($web, $topic);
+    $refresh = 0;
+  }
+
+  # load the rest of the database 
+  $this->SUPER::load($refresh);
 
   # then get the time stamp
   $this->{_loadTime} = $this->_getModificationTime();
-
-  writeDebug("readFromCache=$readFromCache, readFromFile=$readFromFile, removed=$removed");
-
-  return ($readFromCache, $readFromFile, $removed);
 }
-
-###############################################################################
-# clean up text: undo ALIAS markup from AliasPlugin
-#sub readTopicLine {
-#  my ( $this, $topic, $meta, $line, $data ) = @_;
-#}
-
 
 ###############################################################################
 # WARNING: this breaks on Archivists that are not file-based
@@ -137,15 +132,20 @@ sub onReload {
       next;
     }
 
+    # get meta object
+    my ($meta, $text) = Foswiki::Func::readTopic($this->{web}, $topicName);
+    my $origText = $text;
+
+    # SMELL: call getRevisionInfo to make sure the latest revision is loaded
+    # for get('TOPICINFO') further down the code
+    $meta->getRevisionInfo();
+
     writeDebug("reloading $topicName");
 
     # createdate
-    my ($createDate) = &Foswiki::Func::getRevisionInfo($this->{web}, $topicName, 1);
+    my ($createDate, $createAuthor) = Foswiki::Func::getRevisionInfo($this->{web}, $topicName, 1);
     $topic->set('createdate', $createDate);
-
-    # stored procedures
-    my $text = $topic->fastget('text');
-    my $origText = $text;
+    $topic->set('createauthor', $createAuthor);
 
     # get default section
     my $defaultSection = $text;
@@ -241,6 +241,28 @@ sub onReload {
     #print STDERR "found topictitle=$topicTitle\n" if $topicTitle;
     $topic->set('topictitle', $topicTitle);
 
+    # cache comments
+    my @comments = $meta->find('COMMENT');
+    my $commentDate = 0;
+    my $cmts;
+    foreach my $comment (@comments) {
+      my $cmt = $this->{archivist}->newMap(initial => $comment) ;
+      my $cmtDate = $comment->{date};
+      if ($cmtDate > $commentDate) {
+        $commentDate = $cmtDate;
+      }
+      $cmt->set('_up', $topic);
+      $cmt->set('_web', $this->{_cache});
+      $cmts = $topic->get('comments');
+      if (!defined($cmts)) {
+        $cmts = $this->{archivist}->newArray();
+        $topic->set('comments', $cmts);
+      }
+      $cmts->add($cmt);
+    }
+    if ($commentDate) {
+      $topic->set('commentdate', $commentDate);
+    }
   }
 
   #print STDERR "DEBUG: DBCachePlugin::WebDB - done onReload()\n";
