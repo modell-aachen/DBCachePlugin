@@ -281,7 +281,14 @@ sub getFormField {
   $form = $topicObj->fastget($form);
   return '' unless $form;
 
-  my $formfield = $form->fastget($theFormField) || '';
+  my $fieldName = $theFormField;
+
+  # FIXME: regexes copied from Foswiki::Form::fieldTitle2FieldName
+  $fieldName =~ s/!//g;
+  $fieldName =~ s/<nop>//g;
+  $fieldName =~ s/[^A-Za-z0-9_\.]//g;
+
+  my $formfield = $form->fastget($fieldName) || '';
   return urlDecode($formfield);
 }
 
