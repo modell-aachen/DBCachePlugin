@@ -136,6 +136,7 @@ The format, header and footer may contain the standard escape sequences:
    * $dollar: $ sign
    * $n: newline
    * $percnt: % sign
+   * $quot: " sign
 Example:
 <verbatim>%ATTACHMENTS{format="| $name: | $type |"}%</verbatim>
 generates:
@@ -199,6 +200,7 @@ tool or (b) as a tool to extract properties of (a set of) known topics.
 Following variables are expanded in format strings:
    * $percnt: % sign
    * $dollar: $ sign
+   * $quot: " sign
    * $n: newline
    * $nop: "empty string"
    * $count: the number of hits
@@ -280,6 +282,7 @@ The =...format=, =...header= and =...footer= format strings may contain the foll
 
 All format strings may contain the following variables:
    * $dollar: $ sign
+   * $quot: " sign
    * $n: newline
    * $percnt: % sign
 

@@ -1373,6 +1373,7 @@ sub expandVariables {
   $theFormat =~ s/\$trunc\((.*?),\s*(\d+)\)/substr($1,0,$2)/ges;
   $theFormat =~ s/\$t\b/\t/go;
   $theFormat =~ s/\$dollar/\$/go;
+  $theFormat =~ s/\$quot/"/go;
   $theFormat =~ s/${TranslationToken2}//go;
 
   return $theFormat;
