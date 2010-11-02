@@ -38,6 +38,7 @@ use Foswiki::Contrib::DBCacheContrib::Search ();
 use Foswiki::Plugins::DBCachePlugin::WebDB ();
 use Foswiki::Sandbox ();
 use Foswiki::Time ();
+use Cwd;
 
 ###############################################################################
 sub writeDebug {
@@ -1251,25 +1252,26 @@ sub getDB {
   # the database wasn't modified!
 
   $theWeb =~ s/\//\./go;
+  my $webKey = Cwd::abs_path($Foswiki::cfg{DataDir} . '/' . $theWeb);
 
   my $isModified = 0;
-  unless (defined $webDB{$theWeb}) {
+  unless (defined $webDB{$webKey}) {
     # never loaded
     $isModified = 1;
     writeDebug("fresh reload of '$theWeb'");
   } else {
-    unless (defined $webDBIsModified{$theWeb}) {
+    unless (defined $webDBIsModified{$webKey}) {
       # never checked
-      $webDBIsModified{$theWeb} = $webDB{$theWeb}->isModified();
+      $webDBIsModified{$webKey} = $webDB{$webKey}->isModified();
       if (DEBUG) {
-        if ($webDBIsModified{$theWeb}) {
+        if ($webDBIsModified{$webKey}) {
           writeDebug("reloading modified $theWeb");
         } else {
           writeDebug("don't need to load webdb for $theWeb");
         }
       }
     }
-    $isModified = $webDBIsModified{$theWeb};
+    $isModified = $webDBIsModified{$webKey};
   }
 
   if ($isModified) {
@@ -1279,20 +1281,20 @@ sub getDB {
     $impl =~ s/\s+$//go;
     writeDebug("loading new webdb for '$theWeb($isModified) '");
     #writeDebug("impl='$impl'");
-    $webDB{$theWeb} = new $impl($theWeb);
-    $webDB{$theWeb}->load($doRefresh, $baseWeb, $baseTopic);
-    $webDBIsModified{$theWeb} = 0;
+    $webDB{$webKey} = new $impl($theWeb);
+    $webDB{$webKey}->load($doRefresh, $baseWeb, $baseTopic);
+    $webDBIsModified{$webKey} = 0;
   }
 
   if (DEBUG) {
     #require Data::Dumper;
-    #my $db = $webDB{$theWeb};
+    #my $db = $webDB{$webKey};
     #print STDERR "=====================\n";
     #print STDERR Data::Dumper->Dump([$db], [ref $db]);
     #print STDERR "=====================\n";
   }
 
-  return $webDB{$theWeb};
+  return $webDB{$webKey};
 }
 
 ###############################################################################
