@@ -463,6 +463,9 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  02 Nov 2010: | fixed to work with virtual hosts; \
+                  added $quot formatting token; \
+                  support non-ascii characters in $formfield(...) -- Foswiki:Main/AntonioTerceiro |
 |  28 Jul 2010: | added Config.spec to ease configuration, i.e. memory caching; \
                   added documentation for =$sum=;  \
                   added support for Foswiki:Extensions/MetaCommentPlugin |
