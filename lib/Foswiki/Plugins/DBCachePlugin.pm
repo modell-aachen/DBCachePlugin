@@ -23,7 +23,9 @@ use strict;
 use vars qw(
   $VERSION $RELEASE $SHORTDESCRIPTION $NO_PREFS_IN_TOPIC
   $baseWeb $baseTopic $isInitialized
-  $addDependency
+  $addDependency 
+  $isEnabledSaveHandler
+  $isEnabledRenameHandler
 );
 
 $VERSION = '$Rev$';
@@ -46,7 +48,6 @@ sub initPlugin {
   Foswiki::Func::registerTagHandler('DBSTATS', \&DBSTATS);
   Foswiki::Func::registerTagHandler('DBDUMP', \&DBDUMP);    # for debugging
   Foswiki::Func::registerTagHandler('DBRECURSE', \&DBRECURSE);
-  Foswiki::Func::registerTagHandler('ATTACHMENTS', \&ATTACHMENTS);
   Foswiki::Func::registerTagHandler('TOPICTITLE', \&TOPICTITLE);
   Foswiki::Func::registerTagHandler('GETTOPICTITLE', \&TOPICTITLE);
 
@@ -63,6 +64,8 @@ sub initPlugin {
   }
 
   $isInitialized = 0;
+  $isEnabledSaveHandler = 1;
+  $isEnabledRenameHandler = 1;
 
   return 1;
 }
@@ -72,9 +75,7 @@ sub initCore {
   return if $isInitialized;
   $isInitialized = 1;
 
-  eval 'use Foswiki::Plugins::DBCachePlugin::Core;';
-  die $@ if $@;
-
+  require Foswiki::Plugins::DBCachePlugin::Core;
   Foswiki::Plugins::DBCachePlugin::Core::init($baseWeb, $baseTopic);
 }
 
@@ -96,9 +97,38 @@ sub restDBDUMP {
 }
 
 ###############################################################################
+sub disableSaveHandler {
+  $isEnabledSaveHandler = 0;
+}
+
+###############################################################################
+sub enableSaveHandler {
+  $isEnabledSaveHandler = 1;
+}
+
+###############################################################################
+sub disableRenameHandler {
+  $isEnabledRenameHandler = 0;
+}
+
+###############################################################################
+sub enableRenameHandler {
+  $isEnabledRenameHandler = 1;
+}
+
+###############################################################################
+sub loadTopic {
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::loadTopic(@_);
+}
+
+###############################################################################
 # after save handlers
 sub afterSaveHandler {
   #my ($text, $topic, $web, $meta) = @_;
+
+  return unless $isEnabledSaveHandler;
+
   initCore();
   return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler($_[2], $_[1]);
 }
@@ -107,6 +137,8 @@ sub afterSaveHandler {
 # deprecated: use afterUploadSaveHandler instead
 sub afterAttachmentSaveHandler {
   #my ($attrHashRef, $topic, $web) = @_;
+  return unless $isEnabledSaveHandler;
+
   return if $Foswiki::Plugins::VERSION >= 2.1 || 
     $Foswiki::cfg{DBCachePlugin}{UseUploadHandler}; # set this to true if you backported the afterUploadHandler
 
@@ -117,6 +149,8 @@ sub afterAttachmentSaveHandler {
 ###############################################################################
 # Foswiki::Plugins::VERSION >= 2.1
 sub afterUploadHandler {
+  return unless $isEnabledSaveHandler;
+
   my ($attrHashRef, $meta) = @_;
   my $web = $meta->web;
   my $topic = $meta->topic;
@@ -127,10 +161,12 @@ sub afterUploadHandler {
 ###############################################################################
 # Foswiki::Plugins::VERSION >= 2.1
 sub afterRenameHandler {
-  my ($web, $topic, undef, $newWeb, $newTopic) = @_;
+  return unless $isEnabledRenameHandler;
+
+  my ($web, $topic, $attachment, $newWeb, $newTopic, $newAttachment) = @_;
 
   initCore();
-  return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler($web, $topic, $newWeb, $newTopic);
+  return Foswiki::Plugins::DBCachePlugin::Core::afterSaveHandler($web, $topic, $newWeb, $newTopic, $attachment, $newAttachment);
 }
 
 ###############################################################################
@@ -159,11 +195,6 @@ sub DBSTATS {
 sub DBDUMP {
   initCore();
   return Foswiki::Plugins::DBCachePlugin::Core::handleDBDUMP(@_);
-}
-
-sub ATTACHMENTS {
-  initCore();
-  return Foswiki::Plugins::DBCachePlugin::Core::handleATTACHMENTS(@_);
 }
 
 sub DBRECURSE {

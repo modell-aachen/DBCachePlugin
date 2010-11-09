@@ -55,6 +55,7 @@ sub writeDebug {
 sub load {
   my ($this, $refresh, $web, $topic) = @_;
 
+  $refresh ||= 0;
   writeDebug("called load() for $this->{web}, refresh=$refresh");
 
   if ($refresh == 1) {

@@ -17,6 +17,8 @@ package Foswiki::Plugins::DBCachePlugin::Core;
 use strict;
 use warnings;
 
+use POSIX ();
+
 our %webDB;
 our %webDBIsModified;
 our $wikiWordRegex;
@@ -88,15 +90,16 @@ sub renderWikiWordHandler {
 
   #writeDebug("called renderWikiWordHandler($theLinkText, ".($hasExplicitLinkLabel?'1':'0').", $theWeb, $theTopic)");
 
-  return undef if !defined($theWeb) and !defined($theTopic); 
-    # does not work out for TMwikis < 4.2
+  return undef if !defined($theWeb) and !defined($theTopic);
+
+  # does not work out for TMwikis < 4.2
 
   return if $hasExplicitLinkLabel && $theLinkText ne $theTopic;
   return if $theLinkText eq "$theWeb.$theTopic";
 
-    $theWeb =
-      Foswiki::Sandbox::untaintUnchecked($theWeb); # woops why is theWeb tainted
+  $theWeb = Foswiki::Sandbox::untaintUnchecked($theWeb);    # woops why is theWeb tainted
   my $topicTitle = getTopicTitle($theWeb, $theTopic);
+
   #writeDebug("topicTitle=$topicTitle");
 
   $theLinkText = $topicTitle if $topicTitle && $topicTitle ne $theTopic;
@@ -106,7 +109,7 @@ sub renderWikiWordHandler {
 
 ###############################################################################
 sub afterSaveHandler {
-  my ($web, $topic, $newWeb, $newTopic) = @_;
+  my ($web, $topic, $newWeb, $newTopic, $attachment, $newAttachment) = @_;
 
   my $doFullUpdate = $Foswiki::cfg{DBCacheContrib}{AlwaysUpdateCache};
   $doFullUpdate = 1 unless defined $doFullUpdate;
@@ -129,7 +132,11 @@ sub afterSaveHandler {
 
     # move/rename 
     if ($newWeb eq $web) {
-      if ($topic ne $newTopic) {
+      if ($topic eq $newTopic) {
+        if ($attachment && $attachment ne $newAttachment) {
+          $db->loadTopic($web, $topic)
+        }
+      } else {
         $db->loadTopic($web, $newTopic)
       }
     } else { # crossing webs
@@ -143,6 +150,14 @@ sub afterSaveHandler {
 }
 
 ###############################################################################
+sub loadTopic {
+  my ($web, $topic) = @_;
+
+  my $db = getDB($web);
+  return $db->loadTopic($web, $topic);
+}
+
+###############################################################################
 sub handleTOPICTITLE {
   my ($session, $params, $theTopic, $theWeb) = @_;
 
@@ -150,6 +165,7 @@ sub handleTOPICTITLE {
   my $thisWeb = $params->{web} || $baseWeb;
   my $theEncoding = $params->{encode} || '';
   my $theDefault = $params->{default};
+  my $theHideAutoInc = $params->{hideautoinc} || 'off';
 
   $thisTopic =~ s/^\s+//go;
   $thisTopic =~ s/\s+$//go;
@@ -163,7 +179,7 @@ sub handleTOPICTITLE {
     $topicTitle = $theDefault;
   }
 
-  return '' if $topicTitle =~ /X{10}|AUTOINC\d/;
+  return '' if $theHideAutoInc eq 'on' && $topicTitle =~ /X{10}|AUTOINC\d/;
 
   return urlEncode($topicTitle) if $theEncoding eq 'url';
   return entityEncode($topicTitle) if $theEncoding eq 'entity';
@@ -419,8 +435,8 @@ sub handleDBCALL {
     $thisTopic = $2;
   }
 
-  my $thisWeb;
-  ($thisWeb, $thisTopic) = Foswiki::Func::normalizeWebTopicName($baseWeb, $thisTopic);
+  my $thisWeb = $theWeb;
+  ($thisWeb, $thisTopic) = Foswiki::Func::normalizeWebTopicName($thisWeb, $thisTopic);
 
   # find the actual implementation
   if ($theObject) {
@@ -862,224 +878,6 @@ sub dbDump {
   }
 
   return $result."\n</noautolink>\n";
-}
-
-###############################################################################
-sub handleATTACHMENTS {
-  my ($session, $params, $theTopic, $theWeb) = @_;
-
-  #writeDebug("called handleATTACHMENTS($theTopic, $theWeb)");
-  #writeDebug("params=".$params->stringify());
-
-
-  # get parameters
-  my $thisTopic = $params->{_DEFAULT} || $params->{topic} || $baseTopic;
-  my $thisWeb = $params->{web} || $baseWeb;
-  ($thisWeb, $thisTopic) = Foswiki::Func::normalizeWebTopicName($thisWeb, $thisTopic);
-  $Foswiki::Plugins::DBCachePlugin::addDependency->($thisWeb, $thisTopic);
-
-  my $theNames = $params->{names} || $params->{name} || '.*';
-  my $theAttr = $params->{attr} || '.*';
-  my $theAutoAttached = $params->{autoattached} || 2;
-  $theAutoAttached = 0 if $theAutoAttached =~ /^(no|off)$/o;
-  $theAutoAttached = 1 if $theAutoAttached =~ /^(yes|on)$/o;
-  $theAutoAttached = 2 if $theAutoAttached eq 'undef';
-  my $theMinDate = $params->{mindate};
-  $theMinDate = Foswiki::Time::parseTime($theMinDate) if $theMinDate;
-  my $theMaxDate = $params->{maxdate};
-  $theMaxDate = Foswiki::Time::parseTime($theMaxDate) if $theMaxDate;
-  my $theMinSize = $params->{minsize} || 0;
-  my $theMaxSize = $params->{maxsize} || 0;
-  my $theUser = $params->{user} || '.*';
-  my $theHeader = $params->{header} || '';
-  my $theFooter = $params->{footer} || '';
-  my $theFormat = $params->{format};
-  my $theSeparator = $params->{separator};
-  my $theSort = $params->{sort} || $params->{order} || 'name';
-  my $theReverse = $params->{reverse} || 'off';
-  my $theHideNull = $params->{hidenull} || 'off';
-  my $theComment = $params->{comment} || '.*';
-  my $theLimit = $params->{limit} || 0;
-  my $theWarn = $params->{warn} || 'on';
-
-  $theLimit =~ s/[^\d]//go;
-  $theLimit = 0 unless $theLimit;
-
-  $theFormat = '| [[$url][$name]] |  $sizeK | <nobr>$date</nobr> | $wikiuser | $comment |' 
-    unless defined $theFormat;
-  $theSeparator = $params->{sep} unless defined $theSeparator;
-  $theSeparator = "\n" unless defined $theSeparator;
-
-  # get topic
-  my $theDB = getDB($thisWeb);
-  my $topicObj = $theDB->fastget($thisTopic) || '';
-  unless ($topicObj) {
-    return '' if $theWarn eq 'off';
-    return inlineError("DBCachePlugin: $thisWeb.$thisTopic not found");
-  }
-
-  # sort attachments
-  my $attachments = $topicObj->fastget('attachments');
-  return '' unless $attachments;
-
-  my @attachments = $attachments->getValues();
-  if ($theSort eq 'name') {
-    @attachments = sort {lc($a->fastget('name')) cmp lc($b->fastget('name'))} 
-      @attachments;
-  } elsif ($theSort eq 'date') {
-    @attachments = sort {$a->fastget('date') <=> $b->fastget('date')} 
-      @attachments;
-  } elsif ($theSort eq 'size') {
-    @attachments = sort {$a->fastget('size') <=> $b->fastget('size')} 
-      @attachments;
-  } elsif ($theSort eq 'user') {
-    @attachments = sort {$a->fastget('user') cmp $b->fastget('user')} 
-      @attachments;
-  } elsif ($theSort eq 'comment') {
-    @attachments = sort {
-      lc($a->fastget('comment')) cmp lc($b->fastget('comment'))
-    } @attachments;
-  } elsif ($theSort eq 'comment:name') {
-    @attachments = sort {
-      lc($a->fastget('comment') || $a->fastget('name')) 
-        cmp 
-      lc($b->fastget('comment') || $a->fastget('name'))
-    } @attachments;
-  }
-  @attachments = reverse @attachments if $theReverse eq 'on';
-
-  # collect result
-  my @result;
-
-  my $index = 0;
-  foreach my $attachment (@attachments) {
-    my $name = $attachment->fastget('name');
-    #writeDebug("name=$name");
-    next unless $name =~ /^($theNames)$/;
-
-    my $attr = $attachment->fastget('attr');
-    #writeDebug("attr=$attr");
-    next unless $attr =~ /^($theAttr)$/;
-
-    my $autoattached = $attachment->fastget('autoattached') || 0;
-    #writeDebug("autoattached=$autoattached");
-    next if $theAutoAttached == 0 && $autoattached != 0;
-    next if $theAutoAttached == 1 && $autoattached != 1;
-
-    my $date = $attachment->fastget('date');
-    #writeDebug("date=$date");
-    next if $theMinDate && $date < $theMinDate;
-    next if $theMaxDate && $date > $theMaxDate;
-
-    my $user = $attachment->fastget('user') || $attachment->fastget('author') || 'UnknownUser';
-    if ($Foswiki::Plugins::VERSION >= 1.2) { # new Foswikis
-      $user = Foswiki::Func::getWikiName($user);
-    }
-    #writeDebug("user=$user");
-    next unless $user =~ /^($theUser)$/;
-    my ($userWeb, $userTopic) = Foswiki::Func::normalizeWebTopicName('', $user);
-
-    my $size = $attachment->fastget('size') || 0;
-    #writeDebug("size=$size");
-    next if $theMinSize && $size < $theMinSize;
-    next if $theMaxSize && $size > $theMaxSize;
-
-    my $sizeK = sprintf("%.2f",$size/1024);
-    my $sizeM = sprintf("%.2f",$sizeK/1024);
-
-    my $path = $attachment->fastget('path') || '';
-    #writeDebug("path=$path");
-
-    my $comment = $attachment->fastget('comment') || '';
-    next unless $comment =~ /^($theComment)$/;
-
-    my $iconUrl = '%ICONURL{"'.$name.'" alt="else"}%';
-    my $icon = '%ICON{"'.$name.'" alt="else"}%';
-
-    my $version = $attachment->fastget('version') || 1;
-
-    # actions
-    my $webDavUrl = '%WIKIDAVPUBURL%/'.$thisWeb.'/'.$thisTopic.'/'.$name;
-    my $webDavAction = 
-      '<a rel="nofollow" href="'.$webDavUrl.'" '.
-      'title="%MATETEXT{"edit [_1] using webdav" args="<nop>'.$name.'"}%">'.
-      '%MAKETEXT{"edit"}%</a>';
-
-    my $propsUrl = '%SCRIPTURLPATH{"attach"}%/'.$thisWeb.'/'.$thisTopic.'?filename='.$name.'&revInfo=1';
-    my $propsAction =
-      '<a rel="nofollow" href="'.$propsUrl.'" '.
-      'title="%MAKETEXT{"manage properties of [_1]" args="<nop>'.$name.'"}%">'.
-      '%MAKETEXT{"props"}%</a>';
-
-    my $moveUrl = '%SCRIPTURLPATH{"rename"}%/'.$thisWeb.'/'.$thisTopic.'?attachment='.$name;
-    my $moveAction =
-      '<a rel="nofollow" href="'.$moveUrl.'" '.
-      'title="%MAKETEXT{"move or delete [_1]" args="<nop>'.$name.'"}%">'.
-      '%MAKETEXT{"move"}%</a>';
-
-    my $deleteUrl = '%SCRIPTURLPATH{"rename"}%/'.$thisWeb.'/'.$thisTopic.
-      '?attachment='.$name.'&newweb=Trash';
-    my $deleteAction =
-      '<a rel="nofollow" href="'.$deleteUrl.'" '.
-      'title="%MAKETEXT{"delete [_1]" args="<nop>'.$name.'"}%">'.
-      '%MAKETEXT{"delete"}%</a>';
-
-    my $oldVersions = '';
-    if ($theFormat =~ /\$oldversions/ && $version > 1) {
-      my @oldVersions;
-      for (my $i = $version-1; $i > 0; $i--) {
-        my ($date, $user, $rev, $comment) = Foswiki::Func::getRevisionInfo($thisWeb, $thisTopic, $i, $name);
-        $date = formatTime($date);
-        $user = "$userWeb.$userTopic";
-        push @oldVersions, "$date;$user;$rev;$comment";
-      }
-      $oldVersions = join("\n", @oldVersions);
-    }
-
-    $index++;
-    my $text = $theFormat;
-    $text =~ s/\$date\(([^\)]+)\)/_formatTile($date, $1)/ge;
-    $text = expandVariables($text, $thisWeb, $thisTopic,
-      'webdav'=>$webDavAction,
-      'webdavUrl'=>$webDavUrl,
-      'props'=>$propsAction,
-      'propsUrl'=>$propsUrl,
-      'move'=>$moveAction,
-      'moveUrl'=>$moveUrl,
-      'delete'=>$deleteAction,
-      'deleteUrl'=>$deleteUrl,
-      'icon'=>$icon,
-      'iconUrl'=>$iconUrl,
-      'attr'=>$attr,
-      'autoattached'=>$autoattached,
-      'comment'=>$comment,
-      'date'=>formatTime($date),
-      'index'=>$index,
-      'name'=>$name,
-      'path'=>$path,
-      'size'=>$size,
-      'sizeK'=>$sizeK.'K',
-      'sizeM'=>$sizeM.'M',
-      'url'=>"\%PUBURL\%\/$thisWeb\/$thisTopic\/$name",
-      'urlpath'=>"\%PUBURLPATH\%\/$thisWeb\/$thisTopic\/$name",
-      'user'=>$userTopic,
-      'wikiuser'=>"$userWeb.$userTopic",
-      'web'=>$thisWeb,
-      'topic'=>$thisTopic,
-      'version'=>$version,
-      'oldversions'=>$oldVersions,
-    );
-
-    push @result, $text if $text;
-    last if $theLimit && $index >= $theLimit;
-  }
-
-  return '' if $theHideNull eq 'on' && $index == 0;
-
-  $theHeader = expandVariables($theHeader, $thisWeb, $thisTopic, count=>$index);
-  $theFooter = expandVariables($theFooter, $thisWeb, $thisTopic, count=>$index);
-
-  return $theHeader.join($theSeparator,@result).$theFooter;
 }
 
 ###############################################################################
