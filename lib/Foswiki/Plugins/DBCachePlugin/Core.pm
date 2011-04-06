@@ -1,6 +1,6 @@
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright (C) 2005-2010 Michael Daum http://michaeldaumconsulting.com
+# Copyright (C) 2005-2011 Michael Daum http://michaeldaumconsulting.com
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -522,7 +522,7 @@ sub handleDBCALL {
 
   # get section
   my $sectionText = $topicObj->fastget("_section$section") if $topicObj;
-  if (!$sectionText) {
+  if (!defined $sectionText) {
     if($warn) {
       return inlineError("ERROR: DBCALL can't find section '$section' in topic '$thisWeb.$thisTopic'");
     } else {
@@ -577,7 +577,7 @@ sub handleDBCALL {
 sub handleDBSTATS {
   my ($session, $params, $theTopic, $theWeb) = @_;
 
-  #writeDebug("called handleDBSTATS");
+  writeDebug("called handleDBSTATS");
 
   # get args
   my $theSearch = $params->{_DEFAULT} || $params->{search} || '';
@@ -645,7 +645,8 @@ sub handleDBSTATS {
 	}
       }
       next unless $fieldValue; # unless present
-      #writeDebug("reading field $field found $fieldValue");
+      $fieldValue = formatTime($fieldValue) if $field =~ /created(ate)?|modified/;
+      writeDebug("reading field $field found $fieldValue");
 
       foreach my $item (split(/$theSplit/, $fieldValue)) {
         while ($item =~ /$thePattern/g) { # loop over all occurrences of the pattern

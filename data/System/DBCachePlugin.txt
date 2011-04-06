@@ -385,11 +385,12 @@ This option only has an effect using speedy/perperl or fastcgi setups.
    * Set SHORTDESCRIPTION = Lightweight frontend to the <nop>DBCacheContrib
 -->
 |  Author: | Michael Daum |
-|  Copyright &copy;: | 2005-2010, Michael Daum http://michaeldaumconsulting.com |
+|  Copyright &copy;: | 2005-2011, Michael Daum http://michaeldaumconsulting.com |
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  06 Apr 2011: | fixed error where empty sections were confused with non-existing sections | 
 |  09 Nov 2010: | moved ATTACHMENTS over to Foswiki:Extensions/TopicInteractionPlugin; \
                   added API to temporarily disable update handlers; \
                   fixed afterSaveHandler to properly update when attachments change  |
