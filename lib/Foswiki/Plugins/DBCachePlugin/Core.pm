@@ -240,14 +240,19 @@ sub handleTOPICTITLE {
 sub getTopicTitle {
   my ($theWeb, $theTopic) = @_;
 
-  ($theWeb, $theTopic) =
-    Foswiki::Func::normalizeWebTopicName($theWeb, $theTopic);
+  ($theWeb, $theTopic) = Foswiki::Func::normalizeWebTopicName($theWeb, $theTopic);
 
   my $db = getDB($theWeb);
   return $theTopic unless $db;
 
   my $topicObj = $db->fastget($theTopic);
   return $theTopic unless $topicObj;
+
+  if ($Foswiki::cfg{SecureTopicTitles}) {
+    my $wikiName = Foswiki::Func::getWikiName();
+    return $theTopic
+      unless Foswiki::Func::checkAccessPermission('VIEW', $wikiName, undef, $theTopic, $theWeb);
+  }
 
   my $topicTitle = $topicObj->fastget('topictitle');
   return $topicTitle if $topicTitle;

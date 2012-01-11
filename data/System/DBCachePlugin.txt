@@ -413,6 +413,10 @@ If =$Foswiki::cfg{DBCache}{MemoryCache}= is set to FALSE (defaults to TRUE)
 the dbcache once loaded into memory will stay there among multiple requests.
 This option only has an effect using speedy/perperl or fastcgi setups.
 
+---+++ <nop>SecureTopicTitles
+When enabling =$$Foswiki::cfg{SecureTopicTitles}=, !TopicTitles will only be used as a link text in !WikiWords
+when the user has got view access to the target topic.
+
 ---++ Plugin Installation Instructions
 %$INSTALL_INSTRUCTIONS%
 
@@ -426,6 +430,7 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  11 Jan 2012: | implemented !TopicTitles protected by access control rights |
 |  10 Jan 2012: | implemented DBPREV and DBNEXT; \
                   rationalized rendering !TopicTitles instead of the normal !WikiWord linktext; \
                   improved =$flatten()= to look nicer; \
