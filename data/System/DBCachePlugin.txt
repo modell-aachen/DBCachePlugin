@@ -412,6 +412,7 @@ when the user has got view access to the target topic.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|   1 Oct 2012: | handle bad date formfields more gracefully |
 |  11 Jan 2012: | implemented !TopicTitles protected by access control rights |
 |  10 Jan 2012: | implemented DBPREV and DBNEXT; \
                   rationalized rendering !TopicTitles instead of the normal !WikiWord linktext; \
