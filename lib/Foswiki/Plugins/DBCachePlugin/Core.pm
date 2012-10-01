@@ -264,7 +264,7 @@ sub getTopicTitle {
 sub handleDBQUERY {
   my ($session, $params, $theTopic, $theWeb) = @_;
 
-  #writeDebug("called handleDBQUERY(" . $params->stringify() . ")");
+  #writeDebug("called handleDBQUERY("   $params->stringify() . ")");
 
   # params
   my $theSearch = $params->{_DEFAULT} || $params->{search};
@@ -362,6 +362,7 @@ sub handleDBQUERY {
         $temp = $theDB->expandPath($topicObj, $temp);
 	$temp =~ s#\)#${TranslationToken}#g;
 	$temp/geo;
+      $format =~ s/\$d2n\((.*?)\)/parseTime($theDB->expandPath($topicObj, $1))/geo;
       $format =~ s/\$formatTime\((.*?)(?:,\s*'([^']*?)')?\)/formatTime($theDB->expandPath($topicObj, $1), $2)/geo; # single quoted
       $format = expandVariables($format, $topicWeb, $topicName,
 	topic=>$topicName, web=>$topicWeb, index=>$index, count=>$count);
@@ -472,7 +473,6 @@ sub findTopicMethod {
 
     #writeDebug("6");
   }
-
 
   #writeDebug("5");
   return undef;
@@ -1255,19 +1255,35 @@ sub expandVariables {
 }
 
 ###############################################################################
+sub parseTime {
+  my $string = shift;
+
+  $string ||= '';
+
+  my $epoch;
+
+  if ($string =~ /^[\+\-]?\d+$/) {
+    $epoch = $string;
+  } else {
+    eval {
+      $epoch = Foswiki::Time::parseTime($string);
+    };
+  }
+
+  $epoch ||= 0;
+
+  return $epoch;  
+}
+
+###############################################################################
 # fault tolerant wrapper
 sub formatTime {
   my ($time, $format) = @_;
 
-  $time ||= 0;
+  my $epoch = parseTime($time);
+  return '???' if $epoch == 0;
 
-  unless ($time =~ /^-?\d+$/) {
-    $time = Foswiki::Time::parseTime($time);
-  }
-
-  $time ||= 0;
-
-  return Foswiki::Func::formatTime($time, $format)
+  return Foswiki::Func::formatTime($epoch, $format)
 }
 
 

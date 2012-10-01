@@ -348,7 +348,7 @@ sub dbQuery {
   $theReverse ||= '';
   $theSearch ||= '';
 
-  #print STDERR "DEBUG: called dbQuery($theSearch, $theTopics, $theSort, $theReverse) in $this->{web}\n";
+  #print STDERR "DEBUG: called dbQuery(theSearch=$theSearch, theTopics=$theTopics, theSort=$theSort, theReverse=$theReverse) in $this->{web}\n";
 
   # get max hit set
   my @topicNames;
@@ -436,7 +436,7 @@ sub dbQuery {
           $sorting{$topicName} = $this->expandPath($topicObj, join(" and ", @sorting));
           $doNumericalSort = 0 
             if ($doNumericalSort == 1) && $sorting{$topicName} && !($sorting{$topicName} =~ /^[+-]?\d+(\.\d+)?$/);
-          #print STDERR "topicName=$topicName - sorting=$sorting{$topicName} - doNumericalSort=$doNumericalSort\n";
+          #print STDERR "topicName=$topicName - sorting='$sorting{$topicName}' - doNumericalSort=$doNumericalSort\n";
         }
       }
     }
@@ -489,6 +489,7 @@ sub expandPath {
   if ($thePath =~ /^d2n\((.*)\)$/) {
     my $result = $this->expandPath($theRoot, $1);
     return 0 unless defined $result;
+    return $result if $result =~ /^[\+\-]?\d+$/;
     return Foswiki::Time::parseTime($result);
   }
   if ($thePath =~ /^uc\((.*)\)$/) {
