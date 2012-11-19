@@ -113,8 +113,7 @@ sub afterSaveHandler {
 
   #writeDebug("called afterSaveHandler($web, $topic, $newWeb, $newTopic, ..., ...)");
 
-  my $doFullUpdate = $Foswiki::cfg{DBCacheContrib}{AlwaysUpdateCache};
-  $doFullUpdate = 1 unless defined $doFullUpdate;
+  my $doFullUpdate = $Foswiki::cfg{DBCacheContrib}{AlwaysUpdateCache} || 0;
 
   $newWeb ||= $baseWeb;
   $newTopic ||= $baseTopic;
@@ -141,12 +140,20 @@ sub afterSaveHandler {
       } else {
         $db->loadTopic($web, $newTopic)
       }
+
+      # set the internal loadTime counter to the latest modification
+      # time on disk.
+      $db->updateLoadTime;
+
     } else { # crossing webs
       $db = getDB($newWeb); 
       $db->loadTopic($newWeb, $topic);
       if ($topic ne $newTopic) {
         $db->loadTopic($newWeb, $newTopic)
       }
+
+      # same
+      $db->updateLoadTime;
     }
   }
 }
@@ -1105,7 +1112,7 @@ sub formatRecursive {
 sub getDB {
   my ($theWeb, $refresh) = @_;
 
-  writeDebug("called getDB($theWeb)");
+  #writeDebug("called getDB($theWeb)");
 
   unless(Foswiki::Sandbox::validateWebName($theWeb, 1)) {
     if (DEBUG) {

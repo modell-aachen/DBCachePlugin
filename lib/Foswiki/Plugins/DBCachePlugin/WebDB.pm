@@ -71,7 +71,14 @@ sub load {
   # load the rest of the database 
   $this->SUPER::load($refresh);
 
-  # then get the time stamp
+  # set the time stamp
+  $this->updateLoadTime;
+}
+
+###############################################################################
+sub updateLoadTime {
+  my $this = shift;
+
   $this->{_loadTime} = $this->_getModificationTime();
 }
 
@@ -81,7 +88,7 @@ sub _getCacheFile {
   my $this = shift;
 
   my $cacheFile = $this->getArchivist()->{_file};
-  writeDebug("cacheFile=$cacheFile");
+  #writeDebug("cacheFile=$cacheFile");
   return $cacheFile if -f $cacheFile;
 
   writeDebug("cacheFile $cacheFile not found");
@@ -114,7 +121,9 @@ sub touch {
 sub isModified {
   my $this = shift;
 
-  return 1 if $this->_getModificationTime() == 0 || $this->{_loadTime} < $this->_getModificationTime();
+  my $time = $this->_getModificationTime();
+
+  return 1 if $time == 0 || $this->{_loadTime} < $time;
   return 0;
 }
 

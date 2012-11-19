@@ -14,24 +14,25 @@
 
 package Foswiki::Plugins::DBCachePlugin;
 
+use strict;
+use warnings;
+
 #use Monitor;
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin');
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::Core');
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::WebDB');
 
-use strict;
-use vars qw(
-  $VERSION $RELEASE $SHORTDESCRIPTION $NO_PREFS_IN_TOPIC
-  $baseWeb $baseTopic $isInitialized
-  $addDependency 
-  $isEnabledSaveHandler
-  $isEnabledRenameHandler
-);
+our $VERSION = '4.20';
+our $RELEASE = '4.20';
+our $NO_PREFS_IN_TOPIC = 1;
+our $SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 
-$VERSION = '$Rev$';
-$RELEASE = '4.11';
-$NO_PREFS_IN_TOPIC = 1;
-$SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
+our $baseWeb;
+our $baseTopic;
+our $isInitialized;
+our $addDependency;
+our $isEnabledSaveHandler;
+our $isEnabledRenameHandler;
 
 ###############################################################################
 # plugin initializer
