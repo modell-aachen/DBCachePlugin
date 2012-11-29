@@ -1,0 +1,39 @@
+#!/bin/bash
+
+foswiki_root="/home/www-data/foswiki"
+
+exclude_web="Trash|/_.*|oldlogfiles|oldwarnfiles|TWiki|Sandbox|cv-cache|images|Alumni"
+
+do_clear_cache=false
+do_all_topics=false
+refresh="refresh=on"
+
+cd $foswiki_root/bin 2>/dev/null || { 
+  echo "ERROR: can't chdir to $foswiki_root/bin"
+  exit
+}
+
+$do_clear_cache && {
+  echo "### clearing page cache"
+  ./view refresh=all Sandbox/WebPreferences >/dev/null
+}
+
+view_topic() {
+  webtopic=$*
+  /usr/bin/time -f "### reading topic $webtopic took %e seconds" \
+    ./view $refresh topic=$webtopic >/dev/null
+}
+
+
+for dir in `find $foswiki_root/data/* -type d|egrep -v ".*($exclude_web).*"`; do
+  web=`echo $dir|sed 's/^.*data\///g;s/\//\./g'`
+  if $do_all_topics; then
+    for file in $dir/*txt; do
+      topic=`basename $file`
+      topic=${topic/.txt/}
+      view_topic "$web.$topic" >/dev/null
+    done
+  else
+    view_topic "$web.WebHome" >/dev/null
+  fi
+done

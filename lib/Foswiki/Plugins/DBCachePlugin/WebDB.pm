@@ -249,7 +249,11 @@ sub onReload {
     unless ($topicTitle) {
 
       #print STDERR "defaulting to topic name\n";
-      $topicTitle = $topicName;
+      if ($topicName eq 'WebHome') {
+        $topicTitle = $this->{web};
+      } else {
+        $topicTitle = $topicName;
+      }
     }
 
     #print STDERR "found topictitle=$topicTitle\n" if $topicTitle;

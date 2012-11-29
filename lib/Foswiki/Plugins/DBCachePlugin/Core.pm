@@ -133,18 +133,9 @@ sub afterSaveHandler {
 
     # move/rename 
     if ($newWeb eq $web) {
-      if ($topic eq $newTopic) {
-        if ($attachment && $attachment ne $newAttachment) {
-          $db->loadTopic($web, $topic)
-        }
-      } else {
+      if ($topic ne $newTopic) {
         $db->loadTopic($web, $newTopic)
       }
-
-      # set the internal loadTime counter to the latest modification
-      # time on disk.
-      $db->updateLoadTime;
-
     } else { # crossing webs
       $db = getDB($newWeb); 
       $db->loadTopic($newWeb, $topic);
@@ -152,9 +143,11 @@ sub afterSaveHandler {
         $db->loadTopic($newWeb, $newTopic)
       }
 
-      # same
-      $db->updateLoadTime;
     }
+
+    # set the internal loadTime counter to the latest modification
+    # time on disk.
+    $db->updateLoadTime;
   }
 }
 
@@ -263,6 +256,7 @@ sub getTopicTitle {
 
   my $topicTitle = $topicObj->fastget('topictitle');
   return $topicTitle if $topicTitle;
+  return $theWeb if $theTopic eq 'WebHome';
 
   return $theTopic;
 }

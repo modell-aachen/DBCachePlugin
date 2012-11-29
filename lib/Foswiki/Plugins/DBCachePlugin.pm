@@ -22,8 +22,8 @@ use warnings;
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::Core');
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::WebDB');
 
-our $VERSION = '4.20';
-our $RELEASE = '4.20';
+our $VERSION = '4.30';
+our $RELEASE = '4.30';
 our $NO_PREFS_IN_TOPIC = 1;
 our $SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 

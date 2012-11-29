@@ -412,6 +412,7 @@ when the user has got view access to the target topic.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+   29 Nov 2012: | topic title of webhomes now defaults to the web name instead of the topic name |
 |  19 Nov 2012: | improved save performance on large webs |
 |  01 Oct 2012: | handle bad date formfields more gracefully |
 |  11 Jan 2012: | implemented !TopicTitles protected by access control rights |
