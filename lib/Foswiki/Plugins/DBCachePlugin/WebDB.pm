@@ -1,6 +1,6 @@
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright (C) 2005-2012 Michael Daum http://michaeldaumconsulting.com
+# Copyright (C) 2005-2013 Michael Daum http://michaeldaumconsulting.com
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,6 +18,8 @@
 package Foswiki::Plugins::DBCachePlugin::WebDB;
 
 use strict;
+use warnings;
+
 use Foswiki::Contrib::DBCacheContrib ();
 use Foswiki::Contrib::DBCacheContrib::Search ();
 use Foswiki::Plugins::DBCachePlugin ();
@@ -38,7 +40,7 @@ sub new {
   writeDebug("new WebDB for $web");
 
   my $this = bless($class->SUPER::new($web, $cacheName), $class);
-  $this->{_loadTime} = 0;
+  #$this->{_loadTime} = 0;
   $this->{web} = $this->{_web};
   $this->{web} =~ s/\./\//go;
 
@@ -62,69 +64,13 @@ sub load {
   $refresh ||= 0;
   writeDebug("called load() for $this->{web}, refresh=$refresh");
 
-  if ($refresh == 1) {
+  if ($refresh == 1 && defined($web) && defined($topic)) {
     # refresh a single topic
     $this->loadTopic($web, $topic);
     $refresh = 0;
   }
 
-  # load the rest of the database 
   $this->SUPER::load($refresh);
-
-  # set the time stamp
-  $this->updateLoadTime;
-}
-
-###############################################################################
-sub updateLoadTime {
-  my $this = shift;
-
-  $this->{_loadTime} = $this->_getModificationTime();
-}
-
-###############################################################################
-# WARNING: this breaks on Archivists that are not file-based
-sub _getCacheFile {
-  my $this = shift;
-
-  my $cacheFile = $this->getArchivist()->{_file};
-  #writeDebug("cacheFile=$cacheFile");
-  return $cacheFile if -f $cacheFile;
-
-  writeDebug("cacheFile $cacheFile not found");
-
-  return undef;
-}
-
-###############################################################################
-sub _getModificationTime {
-  my $this = shift;
-
-  my $filename = $this->_getCacheFile();
-  return 0 unless $filename;
-  my @stat = stat($filename);
-
-  return $stat[9] || $stat[10] || 0;
-}
-
-###############################################################################
-sub touch {
-  my $this = shift;
-
-  my $filename = $this->_getCacheFile();
-  return 0 unless $filename;
-
-  return utime undef, undef, $filename;
-}
-
-###############################################################################
-sub isModified {
-  my $this = shift;
-
-  my $time = $this->_getModificationTime();
-
-  return 1 if $time == 0 || $this->{_loadTime} < $time;
-  return 0;
 }
 
 ###############################################################################
@@ -182,34 +128,11 @@ sub onReload {
     }
 
     # get topic title
-    my $topicTitle;
 
     # 1. get from preferences
-    my $prefs = $topic->fastget('preferences');
-    if ($prefs) {
+    my $topicTitle = $this->getPreference($topic, 'TOPICTITLE');
 
-      #print STDERR "trying prefs\n";
-      foreach my $pref ($prefs->getValues()) {
-        my $name = $pref->fastget('name');
-        if ($name eq 'TOPICTITLE') {
-          $topicTitle = $pref->fastget('value');
-          $topicTitle = urlDecode($topicTitle);
-          last;
-        }
-      }
-    }
-
-    # 2. get inline preferences
-    unless (defined $topicTitle) {
-
-      #print STDERR "trying inline prefs\n";
-      $origText =~ tr/\r//d;
-      if ($origText =~ /(?:^|\n)(?:\t|   )+\*\s+(?:Set|Local)\s+TOPICTITLE\s*=\s*(.*)(?:$|\n)/o) {
-        $topicTitle = $1;
-      }
-    }
-
-    # 3. get from form
+    # 2. get from form
     unless (defined $topicTitle) {
       my $form = $topic->fastget('form');
       if ($form) {
@@ -221,7 +144,7 @@ sub onReload {
       }
     }
 
-    # 4. get from h1
+    # 3. get from h1
     #    unless (defined $topicTitle) {
     #      #print STDERR "trying h1\n";
     #      #print STDERR "origText=\n$origText\n";
@@ -245,7 +168,7 @@ sub onReload {
     #      }
     #    }
 
-    # 5. use topic name
+    # 4. use topic name
     unless ($topicTitle) {
 
       #print STDERR "defaulting to topic name\n";
@@ -271,7 +194,7 @@ sub onReload {
         $commentDate = $cmtDate;
       }
       $cmt->set('_up', $topic);
-      $cmt->set('_web', $this->{_cache});
+#      $cmt->set('_web', $this->{_cache});
       $cmts = $topic->get('comments');
       if (!defined($cmts)) {
         $cmts = $archivist->newArray();
@@ -390,7 +313,8 @@ sub dbQuery {
     }
   }
 
-  my $webViewPermission = Foswiki::Func::checkAccessPermission('VIEW', $wikiName, undef, undef, $this->{web});
+  my $isAdmin = Foswiki::Func::isAnAdmin();
+  my $webViewPermission = $isAdmin || Foswiki::Func::checkAccessPermission('VIEW', $wikiName, undef, undef, $this->{web});
 
   my $doNumericalSort = 1;
   foreach my $topicName (@topicNames) {
@@ -399,28 +323,28 @@ sub dbQuery {
 
     if (!$search || $search->matches($topicObj)) {
 
-      # TODO: re-code DBCacheContrib to add '   * Set ALLOW... perms into the
-      # META 'preferences', then recode to just use that.
-      my $cachedText = $topicObj->fastget('text');
-
-      #die "no text in $topicName\n" unless defined $cachedText;# never reach
-
-      my $topicHasPerms = $cachedText =~ /(ALLOW|DENY)/;
-      my $cachedPrefsMap = $topicObj->fastget('preferences');
-      if (defined($cachedPrefsMap)) {
-
-        #print STDERR "-----------------$topicName----$cachedPrefsMap";
-        my @cachedPrefs = $cachedPrefsMap->getValues();
-        $topicHasPerms ||= (grep('DENY', @cachedPrefs))
-          || (grep('ALLOW', @cachedPrefs));
+      my $topicHasPerms = 0;
+      unless ($isAdmin) {
+        my $prefs = $topicObj->fastget('preferences');
+        if (defined($prefs)) {
+          foreach my $val ($prefs->getValues()) {
+            if ($val->fastget('name') =~ /^(ALLOW|DENY)TOPIC/) {
+              $topicHasPerms = 1;
+              last;
+            }
+          }
+        }
       }
 
       # don't check access perms on a topic that does not contain any
       # WARNING: this is hardcoded to assume Foswiki-Core permissions - anyone
       # doing pluggable Permissions need to
       # work out howto abstract this concept - or to disable it (its worth about 400mS per topic in the set. (if you're not WikiAdmin))
-      if ((!$topicHasPerms && $webViewPermission)
-        || Foswiki::Func::checkAccessPermission('VIEW', $wikiName, undef, $topicName, $this->{web}))
+      if (
+        $isAdmin 
+        || (!$topicHasPerms && $webViewPermission)
+        || $this->checkAccessPermission('VIEW', $wikiName, $topicObj) #Foswiki::Func::checkAccessPermission('VIEW', $wikiName, undef, $topicName, $this->{web}))
+        ) 
       {
 
         $hits{$topicName} = $topicObj;
@@ -449,8 +373,8 @@ sub dbQuery {
           $sorting{$topicName} = $this->expandPath($topicObj, join(" and ", @sorting));
           $doNumericalSort = 0 
             if ($doNumericalSort == 1) && $sorting{$topicName} && !($sorting{$topicName} =~ /^[+-]?\d+(\.\d+)?$/);
-          #print STDERR "topicName=$topicName - sorting='$sorting{$topicName}' - doNumericalSort=$doNumericalSort\n";
         }
+        #print STDERR "topicName=$topicName - sorting='$sorting{$topicName}' - doNumericalSort=$doNumericalSort\n";
       }
     }
   }
@@ -573,6 +497,117 @@ sub expandPath {
 
   #print STDERR "DEBUG: result is empty\n";
   return '';
+}
+
+###############################################################################
+# a variation reading acls from cache instead from raw txt
+sub checkAccessPermission {
+  my ($this, $mode, $user, $topic) = @_;
+
+#print STDERR "called checkAccessPermission($mode, $user, $topic) ... ";
+
+  my $cUID;
+  my $session = $Foswiki::Plugins::SESSION;
+  my $users = $session->{users};
+
+  if (defined $cUID) {
+    $cUID = Foswiki::Func::getCanonicalUserID($user)
+      || Foswiki::Func::getCanonicalUserID($Foswiki::cfg{DefaultUserLogin});
+  } else {
+    $cUID ||= $session->{user};
+  }
+
+  if ($users->isAdmin($cUID)) {
+    return 1;
+  }
+
+  $mode = uc($mode);
+
+  my $allow = $this->getACL($topic, 'ALLOWTOPIC' . $mode);
+  my $deny = $this->getACL($topic, 'DENYTOPIC' . $mode);
+
+  # Check DENYTOPIC
+  if (defined($deny)) {
+    if (scalar(@$deny) != 0) {
+      if ($users->isInUserList($cUID, $deny)) {
+#print STDERR "1: DENY user=$user mode=$mode topic=".$topic->fastget('name'). "\n";
+        return 0;
+      }
+    } else {
+
+      # If DENYTOPIC is empty, don't deny _anyone_
+#print STDERR "2: result = 1\n";
+      return 1;
+    }
+  }
+
+  # Check ALLOWTOPIC. If this is defined the user _must_ be in it
+  if (defined($allow) && scalar(@$allow) != 0) {
+    if ($users->isInUserList($cUID, $allow)) {
+#print STDERR "3: result = 1\n";
+      return 1;
+    }
+#print STDERR "2: DENY user=$user mode=$mode topic=".$topic->fastget('name'). "\n";
+    return 0;
+  }
+
+#print STDERR "5: result = 1\n";
+  return 1;
+}
+
+###############################################################################
+sub getACL {
+  my ($this, $topic, $mode) = @_;
+
+  unless (ref($topic)) {
+    $topic = $this->fastget($topic);
+  }
+
+  return unless defined $topic;
+
+  my $text = $this->getPreference($topic, $mode);
+#print STDERR "getACL($topic, $mode), text=".($text||'')."\n";
+  return unless defined $text;
+
+  # Remove HTML tags (compatibility, inherited from Users.pm
+  $text =~ s/(<[^>]*>)//g;
+
+  # Dump the users web specifier if userweb
+  my @list = grep { /\S/ } map {
+      s/^($Foswiki::cfg{UsersWebName}|%USERSWEB%|%MAINWEB%)\.//;
+      $_
+  } split( /[,\s]+/, $text );
+
+#print STDERR "getACL($mode): ".join(', ', @list)."\n";
+
+  return \@list;
+}
+
+###############################################################################
+sub getPreference {
+  my ($this, $topic, $key) = @_;
+
+  unless (ref($topic)) {
+    $topic = $this->fastget($topic);
+  }
+
+  return unless defined $topic;
+
+  my $prefs = $topic->fastget('preferences');
+
+  return unless defined $prefs;
+
+  my $value;
+  foreach my $pref ($prefs->getValues()) {
+    my $name = $pref->fastget('name');
+    if ($name eq $key) {
+      $value = $pref->fastget('value');
+      $value = urlDecode($value);
+      last;
+    }
+  }
+
+  return $value;
 }
 
 ###############################################################################

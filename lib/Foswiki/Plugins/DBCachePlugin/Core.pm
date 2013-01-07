@@ -1,6 +1,6 @@
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright (C) 2005-2012 Michael Daum http://michaeldaumconsulting.com
+# Copyright (C) 2005-2013 Michael Daum http://michaeldaumconsulting.com
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,6 +21,7 @@ use POSIX ();
 
 our %webDB;
 our %webDBIsModified;
+our %webKeys;
 our $wikiWordRegex;
 our $webNameRegex;
 our $defaultWebNameRegex;
@@ -31,7 +32,6 @@ our $baseTopic;
 our $dbQueryCurrentWeb;
 our $doRefresh;
 our $TranslationToken = "\0";
-our $TranslationToken2 = "\1"; 
 
 use constant DEBUG => 0; # toggle me
 
@@ -52,13 +52,8 @@ sub writeDebug {
 sub init {
   ($baseWeb, $baseTopic) = @_;
 
-  %webDBIsModified = ();
-
   my $query = Foswiki::Func::getCgiQuery();
   my $memoryCache = $Foswiki::cfg{DBCachePlugin}{MemoryCache};
-
-  # deprecated
-  $memoryCache = $Foswiki::cfg{DBCache}{MemoryCache} unless defined $memoryCache;
   $memoryCache = 1 unless defined $memoryCache;
 
   if ($memoryCache) {
@@ -76,6 +71,9 @@ sub init {
   } else {
     %webDB = ();
   }
+
+  %webDBIsModified = ();
+  %webKeys = ();
 
   $wikiWordRegex = Foswiki::Func::getRegularExpression('wikiWordRegex');
   $webNameRegex  = Foswiki::Func::getRegularExpression('webNameRegex');
@@ -113,42 +111,29 @@ sub afterSaveHandler {
 
   #writeDebug("called afterSaveHandler($web, $topic, $newWeb, $newTopic, ..., ...)");
 
-  my $doFullUpdate = $Foswiki::cfg{DBCacheContrib}{AlwaysUpdateCache} || 0;
-
   $newWeb ||= $baseWeb;
   $newTopic ||= $baseTopic;
 
-  if ($doFullUpdate) {
-    my $db = getDB($newWeb);
-    $db->touch();
+  my $db = getDB($web);
+  $db->loadTopic($web, $topic);
 
-    # move/rename from one web to the other
-    if ($newWeb ne $web) {
-      $db = getDB($web); 
-      $db->touch();
+  # move/rename 
+  if ($newWeb eq $web) {
+    if ($topic ne $newTopic) {
+      $db->loadTopic($web, $newTopic)
     }
-  } else {
-    my $db = getDB($web);
-    $db->loadTopic($web, $topic);
-
-    # move/rename 
-    if ($newWeb eq $web) {
-      if ($topic ne $newTopic) {
-        $db->loadTopic($web, $newTopic)
-      }
-    } else { # crossing webs
-      $db = getDB($newWeb); 
-      $db->loadTopic($newWeb, $topic);
-      if ($topic ne $newTopic) {
-        $db->loadTopic($newWeb, $newTopic)
-      }
-
+  } else { # crossing webs
+    $db = getDB($newWeb); 
+    $db->loadTopic($newWeb, $topic);
+    if ($topic ne $newTopic) {
+      $db->loadTopic($newWeb, $newTopic)
     }
 
-    # set the internal loadTime counter to the latest modification
-    # time on disk.
-    $db->updateLoadTime;
   }
+
+  # set the internal loadTime counter to the latest modification
+  # time on disk.
+  $db->getArchivist->updateCacheTime();
 }
 
 ###############################################################################
@@ -214,7 +199,7 @@ sub handleTOPICTITLE {
   my $thisWeb = $params->{web} || $baseWeb;
   my $theEncoding = $params->{encode} || '';
   my $theDefault = $params->{default};
-  my $theHideAutoInc = $params->{hideautoinc} || 'off';
+  my $theHideAutoInc = Foswiki::Func::isTrue($params->{hideautoinc}, 0);
 
   $thisTopic =~ s/^\s+//go;
   $thisTopic =~ s/\s+$//go;
@@ -228,7 +213,7 @@ sub handleTOPICTITLE {
     $topicTitle = $theDefault;
   }
 
-  return '' if $theHideAutoInc eq 'on' && $topicTitle =~ /X{10}|AUTOINC\d/;
+  return '' if $theHideAutoInc && $topicTitle =~ /X{10}|AUTOINC\d/;
 
   return urlEncode($topicTitle) if $theEncoding eq 'url';
   return entityEncode($topicTitle) if $theEncoding eq 'entity';
@@ -282,10 +267,8 @@ sub handleDBQUERY {
   my $theSep = $params->{separator};
   my $theLimit = $params->{limit} || '';
   my $theSkip = $params->{skip} || 0;
-  my $theHideNull = $params->{hidenull} || 'off';
-  my $theRemote = $params->remove('remote') || 'off';
-  $theRemote = ($theRemote =~ /^(on|force|1|yes)$/)?1:0;
-  $theRemote = ($theRemote eq 'on')?1:0;
+  my $theHideNull = Foswiki::Func::isTrue($params->{hidenull}, 0);
+  my $theRemote = Foswiki::Func::isTrue($params->remove('remote'), 0);
 
   $theFormat = '$topic' unless defined $theFormat;
   $theFormat = '' if $theFormat eq 'none';
@@ -308,6 +291,7 @@ sub handleDBQUERY {
   # normalize 
   unless ($theSkip =~ /^[\d]+$/) {
     $theSkip = expandVariables($theSkip, $thisWeb, $thisTopic);
+    $theSkip = expandFormatTokens($theSkip);
     $theSkip = Foswiki::Func::expandCommonVariables($theSkip, $thisTopic, $thisWeb);
   }
   $theSkip =~ s/[^-\d]//go;
@@ -326,10 +310,11 @@ sub handleDBQUERY {
   return inlineError($msg) if $msg;
 
   my $count = scalar(@$topicNames);
-  return '' if ($count <= $theSkip) && $theHideNull eq 'on';
+  return '' if ($count <= $theSkip) && $theHideNull;
 
   unless ($theLimit =~ /^[\d]+$/) {
     $theLimit = expandVariables($theLimit, $thisWeb, $thisTopic);
+    $theLimit = expandFormatTokens($theLimit);
     $theLimit = Foswiki::Func::expandCommonVariables($theLimit, $thisTopic, $thisWeb);
   }
   $theLimit =~ s/[^\d]//go;
@@ -337,52 +322,43 @@ sub handleDBQUERY {
   $theLimit += $theSkip;
 
   # format
-  my $text = '';
+  my @result = ();
   if ($theFormat && $theLimit) {
     my $index = 0;
-    my $isFirst = 1;
     foreach my $topicName (@$topicNames) {
       #writeDebug("topicName=$topicName");
       $index++;
       next if $index <= $theSkip;
       my $topicObj = $hits->{$topicName};
-      my $topicWeb = $topicObj->fastget('web');
-      my $format = '';
-      $format = $theSep unless $isFirst;
-      $isFirst = 0;
-      $format .= $theFormat;
-      $format =~ s/\$pattern\((.*?)\)/extractPattern($topicObj, $1)/geo;
-      $format =~ s/\$formfield\((.*?)\)/
+      my $line = $theFormat;
+      $line =~ s/\$pattern\((.*?)\)/extractPattern($topicObj, $1)/geo;
+      $line =~ s/\$formfield\((.*?)\)/
         my $temp = $theDB->getFormField($topicName, $1);
 	$temp =~ s#\)#${TranslationToken}#g;
 	$temp/geo;
-      $format =~ s/\$expand\((.*?)\)/
+      $line =~ s/\$expand\((.*?)\)/
         my $temp = $1;
-        $temp = expandVariables($temp, $topicWeb, $topicName,
-          topic=>$topicName, web=>$topicWeb, index=>$index, count=>$count);
         $temp = $theDB->expandPath($topicObj, $temp);
 	$temp =~ s#\)#${TranslationToken}#g;
 	$temp/geo;
-      $format =~ s/\$d2n\((.*?)\)/parseTime($theDB->expandPath($topicObj, $1))/geo;
-      $format =~ s/\$formatTime\((.*?)(?:,\s*'([^']*?)')?\)/formatTime($theDB->expandPath($topicObj, $1), $2)/geo; # single quoted
-      $format = expandVariables($format, $topicWeb, $topicName,
-	topic=>$topicName, web=>$topicWeb, index=>$index, count=>$count);
-      $format =~ s/${TranslationToken}/)/go;
-      $format = Foswiki::Func::expandCommonVariables($format, $topicName, $topicWeb);
-      $text .= $format;
+      $line =~ s/\$d2n\((.*?)\)/parseTime($theDB->expandPath($topicObj, $1))/geo;
+      $line =~ s/\$formatTime\((.*?)(?:,\s*'([^']*?)')?\)/formatTime($theDB->expandPath($topicObj, $1), $2)/geo; # single quoted
+      $line =~ s/\$topic/$topicName/g;
+      $line =~ s/\$web/$thisWeb/g;
+      $line =~ s/\$index/$index/g;
+      $line =~ s/${TranslationToken}/)/go;
+      push @result, $line;
 
-      $Foswiki::Plugins::DBCachePlugin::addDependency->($topicWeb, $topicName);
+      $Foswiki::Plugins::DBCachePlugin::addDependency->($thisWeb, $topicName);
 
       last if $index == $theLimit;
     }
   }
 
-  $theHeader = expandVariables($theHeader, $thisWeb, $thisTopic, count=>$count, web=>$thisWeb)
-    if $theHeader;
-  $theFooter = expandVariables($theFooter, $thisWeb, $thisTopic, count=>$count, web=>$thisWeb)
-    if defined $theFooter;
+  my $text = $theHeader.join($theSep, @result).$theFooter;
 
-  $text = Foswiki::Func::expandCommonVariables($theHeader.$text.$theFooter, $thisTopic, $thisWeb);
+  $text = expandVariables($text, $thisWeb, $thisTopic, count=>$count, web=>$thisWeb);
+  $text = expandFormatTokens($text);
 
   fixInclude($session, $thisWeb, $text) if $theRemote;
 
@@ -495,6 +471,7 @@ sub handleDBCALL {
     $thisTopic = $2;
   }
 
+
   my $thisWeb = $baseWeb; # Note: default to $baseWeb and _not_ to $theWeb
   ($thisWeb, $thisTopic) = Foswiki::Func::normalizeWebTopicName($thisWeb, $thisTopic);
 
@@ -523,10 +500,8 @@ sub handleDBCALL {
   my $args = $params->stringify();
 
   my $section = $params->remove('section') || 'default';
-  my $warn = $params->remove('warn') || 'on';
-  $warn = ($warn eq 'on')?1:0;
-  my $remote = $params->remove('remote') || 'off';
-  $remote = ($remote =~ /^(on|force|1|yes)$/)?1:0;
+  my $warn = Foswiki::Func::isTrue($params->remove('warn'), 1);
+  my $remote = Foswiki::Func::isTrue($params->remove('remote'), 0);
 
   #writeDebug("thisWeb=$thisWeb thisTopic=$thisTopic baseWeb=$baseWeb baseTopic=$baseTopic");
 
@@ -653,19 +628,17 @@ sub handleDBSTATS {
   my $theSep = $params->{separator};
   my $theFields = $params->{fields} || $params->{field} || 'text';
   my $theSort = $params->{sort} || $params->{order} || 'alpha';
-  my $theReverse = $params->{reverse} || 'off';
+  my $theReverse = Foswiki::Func::isTrue($params->{reverse}, 0);
   my $theLimit = $params->{limit} || 0;
-  my $theHideNull = $params->{hidenull} || 'off';
+  my $theHideNull = Foswiki::Func::isTrue($params->{hidenull}, 0);
   my $theExclude = $params->{exclude};
   my $theInclude = $params->{include};
-  my $theCase = $params->{casesensitive} || 'off';
+  my $theCase = Foswiki::Func::isTrue($params->{casesensitive}, 0);
   $theLimit =~ s/[^\d]//go;
 
   $theFormat = '   * $key: $count' unless defined $theFormat;
   $theSep = $params->{sep} unless defined $theSep;
   $theSep = '$n' unless defined $theSep;
-
-  $theCase = ($theCase eq 'on'?1:0);
 
   #writeDebug("theSearch=$theSearch");
   #writeDebug("thisWeb=$thisWeb");
@@ -678,9 +651,12 @@ sub handleDBSTATS {
   #writeDebug("theFields=$theFields");
 
   # build seach object
-  my $search = new Foswiki::Contrib::DBCacheContrib::Search($theSearch);
-  unless ($search) {
-    return "ERROR: can't parse query $theSearch";
+  my $search;
+  if (defined $theSearch && $theSearch ne '') {
+    $search = new Foswiki::Contrib::DBCacheContrib::Search($theSearch);
+    unless ($search) {
+      return "ERROR: can't parse query $theSearch";
+    }
   }
 
   # compute statistics
@@ -690,12 +666,12 @@ sub handleDBSTATS {
   my @topicNames = $theDB->getKeys();
   foreach my $topicName (@topicNames) { # loop over all topics
     my $topicObj = $theDB->fastget($topicName);
-    next unless $search->matches($topicObj); # that match the query
-    next unless Foswiki::Func::checkAccessPermission('VIEW', 
-      $wikiName, undef, $topicName, $thisWeb);
+    next if $search && !$search->matches($topicObj); # that match the query
+    next unless $theDB->checkAccessPermission('VIEW', $wikiName, $topicObj);
 
     #writeDebug("found topic $topicName");
     my $createdate = $topicObj->fastget('createdate');
+    my $modified = $topicObj->get('info.date');
     foreach my $field (split(/\s*,\s*/, $theFields)) { # loop over all fields
       my $fieldValue = $topicObj->fastget($field);
       if (!$fieldValue || ref($fieldValue)) {
@@ -727,23 +703,27 @@ sub handleDBSTATS {
           my $record = $statistics{$key1};
           if ($record) {
             $record->{count}++;
-            $record->{from} = $createdate if $record->{from} > $createdate;
-            $record->{to} = $createdate if $record->{to} < $createdate;
+            $record->{createdate_from} = $createdate if $record->{createdate_from} > $createdate;
+            $record->{createdate_to} = $createdate if $record->{createdate_to} < $createdate;
+            $record->{modified_from} = $modified if $record->{modified_from} > $modified;
+            $record->{modified_to} = $modified if $record->{modified_to} < $modified;
             push @{$record->{topics}}, $topicName;
           } else {
             my %record = (
               count=>1,
-              from=>$createdate,
-              to=>$createdate,
+              modified_from=>$modified,
+              modified_to=>$modified,
+              createdate_from=>$createdate,
+              createdate_to=>$createdate,
               keyList=>[$key1, $key2, $key3, $key4, $key5],
               topics=>[$topicName],
             );
             $statistics{$key1} = \%record;
           }
-          $Foswiki::Plugins::DBCachePlugin::addDependency->($thisWeb, $topicName);
         }
       }
     }
+    $Foswiki::Plugins::DBCachePlugin::addDependency->($thisWeb, $topicName);
   }
   my $min = 99999999;
   my $max = 0;
@@ -757,18 +737,25 @@ sub handleDBSTATS {
   my $numkeys = scalar(keys %statistics);
   my $mean = 0;
   $mean = (($sum+0.0) / $numkeys) if $numkeys;
-  return '' if $theHideNull eq 'on' && $numkeys == 0;
+  return '' if $theHideNull && $numkeys == 0;
 
   # format output
-  my $result = '';
   my @sortedKeys;
-  if ($theSort =~ /^created(from)?$/) {
+  if ($theSort =~ /^modified(from)?$/) {
     @sortedKeys = sort {
-      $statistics{$a}->{from} <=> $statistics{$b}->{from}
+      $statistics{$a}->{modified_from} <=> $statistics{$b}->{modified_from}
+    } keys %statistics
+  } elsif ($theSort eq 'modifiedto') {
+    @sortedKeys = sort {
+      $statistics{$a}->{modified_to} <=> $statistics{$b}->{modified_to}
+    } keys %statistics
+  } elsif ($theSort =~ /^created(from)?$/) {
+    @sortedKeys = sort {
+      $statistics{$a}->{createdate_from} <=> $statistics{$b}->{createdate_from}
     } keys %statistics
   } elsif ($theSort eq 'createdto') {
     @sortedKeys = sort {
-      $statistics{$a}->{to} <=> $statistics{$b}->{to}
+      $statistics{$a}->{createdate_to} <=> $statistics{$b}->{createdate_to}
     } keys %statistics
   } elsif ($theSort eq 'count') {
     @sortedKeys = sort {
@@ -777,17 +764,16 @@ sub handleDBSTATS {
   } else {
     @sortedKeys = sort keys %statistics;
   }
-  @sortedKeys = reverse @sortedKeys if $theReverse eq 'on';
+  @sortedKeys = reverse @sortedKeys if $theReverse;
   my $index = 0;
+  my @result = ();
   foreach my $key (@sortedKeys) {
     $index++;
     my $record = $statistics{$key};
     my $text;
     my ($key1, $key2, $key3, $key4, $key5) =
       @{$record->{keyList}};
-    $text = $theSep if $result;
-    $text .= $theFormat;
-    $result .= expandVariables($text, 
+    my $line = expandVariables($theFormat, 
       $thisWeb,
       $thisTopic,
       'web'=>$thisWeb,
@@ -801,19 +787,20 @@ sub handleDBSTATS {
       'count'=>$record->{count}, 
       'index'=>$index,
     );
+    push @result, $line;
 
     last if $theLimit && $index == $theLimit;
   }
-  $result = expandVariables($theHeader.$result.$theFooter, $thisWeb, $thisTopic,
+
+  my $text = expandVariables($theHeader.join($theSep, @result).$theFooter, $thisWeb, $thisTopic,
     'min'=>$min,
     'max'=>$max,
     'sum'=>$sum,
     'mean'=>$mean,
     'keys'=>$numkeys,
   );
-  $result = Foswiki::Func::expandCommonVariables($result, $thisTopic, $thisWeb);
 
-  return $result;
+  return expandFormatTokens($text);
 }
 
 ###############################################################################
@@ -909,14 +896,11 @@ sub dbDump {
   if ($prefs) {
     $result .= "<p/>\n---++ Preferences = $prefs\n";
     $result .= "<table class='foswikiTable'>\n";
-    $result .= '<tr><th>type</th><th>name</th><th>title</th><th>value</th><th>_up</th><th>_web</th></tr>'."\n";
+    $result .= '<tr><th>type</th><th>name</th><th>value</th></tr>'."\n";
     foreach my $pref (sort {$a->fastget('name') cmp $b->fastget('name')} $prefs->getValues()) {
       $result .= "<tr><td>".$pref->fastget('type')."</td>\n";
       $result .= "<td>".$pref->fastget('name')."</td>\n";
-      $result .= "<td>".$pref->fastget('title')."</td>\n";
       $result .= "<td>".$pref->fastget('value')."</td>\n";
-      $result .= "<td>".$pref->fastget('_up')."</td>\n";
-      $result .= "<td>".$pref->fastget('_web')."</td>\n";
       $result .= "</tr>\n";
     }
     $result .= "</table>\n";
@@ -986,21 +970,18 @@ sub handleDBRECURSE {
   my $theDB = getDB($thisWeb);
   $params->{_count} = 0;
   my $result = formatRecursive($theDB, $thisWeb, $thisTopic, $params);
-  return '' unless $result;
 
   # render result
   return '' if $params->{hidenull} eq 'on' && $params->{_count} == 0;
 
-  return 
-    expandVariables(
-      ($params->{_count} == 1)?$params->{singleheader}:$params->{header}, 
-      $thisWeb, $thisTopic, 
-      count=>$params->{_count}).
-    join($params->{separator},@$result).
-    expandVariables(
+  my $text = expandVariables(
+      ($params->{_count} == 1)?$params->{singleheader}:$params->{header}.
+      join($params->{separator},@$result).
       ($params->{_count} == 1)?$params->{singlefooter}:$params->{footer}, 
       $thisWeb, $thisTopic, 
       count=>$params->{_count});
+
+  return expandFormatTokens($text);
 }
 
 ###############################################################################
@@ -1103,83 +1084,74 @@ sub formatRecursive {
 }
 
 ###############################################################################
+sub getWebKey {
+  my $web = shift;
+
+  my $key = $webKeys{$web};
+  return $key if defined $key;
+
+  unless(Foswiki::Sandbox::validateWebName($web, 1)) {
+#   if (DEBUG) {
+#     require Devel::StackTrace;
+#     my $trace = Devel::StackTrace->new;
+#     writeDebug($trace->as_string);
+#   }
+#   die "invalid webname $web";
+    return;
+  }
+
+  $web =~ s/\//\./go;
+  $key = $webKeys{$web} = Cwd::abs_path($Foswiki::cfg{DataDir} . '/' . $web);
+
+  return $key;
+}
+
+###############################################################################
 sub getDB {
   my ($theWeb, $refresh) = @_;
 
   #writeDebug("called getDB($theWeb)");
 
-  unless(Foswiki::Sandbox::validateWebName($theWeb, 1)) {
-    if (DEBUG) {
-      require Devel::StackTrace;
-      my $trace = Devel::StackTrace->new;
-      writeDebug($trace->as_string);
-    }
-
-    #die "invalid webname $theWeb";
-    return;
-  }
-
-  # We do not need to reload the cache if we run on mod_perl or fastcgi or
-  # whatever perl accelerator that keeps our global variables and 
-  # the database wasn't modified!
-
-  $theWeb =~ s/\//\./go;
-  my $webKey = Cwd::abs_path($Foswiki::cfg{DataDir} . '/' . $theWeb);
+  my $webKey = getWebKey($theWeb);
+  return unless defined $webKey; # invalid webname
 
   #writeDebug("webKey=$webKey");
 
-  my $isModified = 0;
-  unless (defined $webDB{$webKey}) {
-    # never loaded
-    $isModified = 1;
-    writeDebug("fresh reload of '$theWeb'");
-  } else {
-    unless (defined $webDBIsModified{$webKey}) {
-      # never checked
-      $webDBIsModified{$webKey} = $webDB{$webKey}->isModified();
-      if (DEBUG) {
-        if ($webDBIsModified{$webKey}) {
-          writeDebug("reloading modified $theWeb");
-        } else {
-          writeDebug("don't need to load webdb for $theWeb");
-        }
-      }
-    }
-    $isModified = $webDBIsModified{$webKey};
-  }
+  my $db = $webDB{$webKey};
+  my $isModified = 1;
 
-  if ($isModified || $refresh) {
+  unless (defined $db) {
     my $impl = Foswiki::Func::getPreferencesValue('WEBDB', $theWeb)
       || 'Foswiki::Plugins::DBCachePlugin::WebDB';
     $impl =~ s/^\s+//go;
     $impl =~ s/\s+$//go;
+
     writeDebug("loading new webdb for '$theWeb'");
-    #writeDebug("impl='$impl'");
-    $webDB{$webKey} = new $impl($theWeb);
-    $webDB{$webKey}->load($doRefresh, $baseWeb, $baseTopic);
-    $webDBIsModified{$webKey} = 0;
+    $db = $webDB{$webKey} = new $impl($theWeb);
+
+  } else {
+    $isModified = $webDBIsModified{$webKey};
+    unless (defined $isModified) {
+      $isModified = $webDBIsModified{$webKey} = $db->getArchivist->isModified();
+    }
   }
 
-  if (DEBUG) {
-    #require Data::Dumper;
-    #my $db = $webDB{$webKey};
-    #print STDERR "=====================\n";
-    #print STDERR Data::Dumper->Dump([$db], [ref $db]);
-    #print STDERR "=====================\n";
+  if ($isModified || $refresh) {
+    $db->load($doRefresh, $baseWeb, $baseTopic);
   }
 
-  return $webDB{$webKey};
+  return $db;
 }
 
 ###############################################################################
-sub DESTROY_ALL {
-  foreach my $web (keys %webDB) {
-    #writeDebug("closing db for $web");
-    $webDB{$web}->touch();
-    delete $webDB{$web};
-  }
-  %webDB = ();
-  %webDBIsModified = ();
+sub unloadDB {
+  my $web = shift;
+
+  return unless $web;
+
+  delete $webDB{$web};
+  delete $webDBIsModified{$web};
+  delete $webKeys{$web};
 }
 
 
@@ -1228,31 +1200,35 @@ sub fixIncludeLink {
 }
 
 ###############################################################################
+sub expandFormatTokens {
+  my $text = shift;
+
+  return '' unless defined $text;
+
+  $text =~ s/\$perce?nt/\%/go;
+  $text =~ s/\$nop//g;
+  $text =~ s/\$n/\n/go;
+  $text =~ s/\$encode\((.*?)\)/entityEncode($1)/ges;
+  $text =~ s/\$trunc\((.*?),\s*(\d+)\)/substr($1,0,$2)/ges;
+  $text =~ s/\$dollar/\$/go;
+
+  return $text;
+}
+
+###############################################################################
 sub expandVariables {
-  my ($theFormat, $web, $topic, %params) = @_;
+  my ($text, $web, $topic, %params) = @_;
 
-  return '' unless defined $theFormat;
+  return '' unless defined $text;
   
-  foreach my $key (keys %params) {
-    my $val = $params{$key};
-    next unless defined $val;
-    if($theFormat =~ s/\$$key\b/${TranslationToken2}$params{$key}${TranslationToken2}/g) {
-      #writeDebug("expanding $key->$params{$key}");
-    }
+  while (my ($key, $val) =  each %params) {
+    $text =~ s/\$$key\b/$val/g if defined $val;
   }
-  $theFormat =~ s/\$perce?nt/\%/go;
-  $theFormat =~ s/\$nop//g;
-  $theFormat =~ s/\$n/\n/go;
-  $theFormat =~ s/\$flatten\((.*?)\)/flatten($1, $web, $topic)/ges;
-  $theFormat =~ s/\$rss\((.*?)\)/rss($1, $web, $topic)/ges;
-  $theFormat =~ s/\$encode\((.*?)\)/entityEncode($1)/ges;
-  $theFormat =~ s/\$trunc\((.*?),\s*(\d+)\)/substr($1,0,$2)/ges;
-  $theFormat =~ s/\$t\b/\t/go;
-  $theFormat =~ s/\$dollar/\$/go;
-  $theFormat =~ s/\$quot/"/go;
-  $theFormat =~ s/${TranslationToken2}//go;
 
-  return $theFormat;
+  $text =~ s/\$flatten\((.*?)\)/flatten($1, $web, $topic)/ges;
+  $text =~ s/\$rss\((.*?)\)/rss($1, $web, $topic)/ges;
+
+  return $text;
 }
 
 ###############################################################################
@@ -1294,7 +1270,6 @@ sub rss {
   my ($text, $web, $topic) = @_;
 
   $text = "\n<noautolink>\n$text\n</noautolink>\n";
-  $text = Foswiki::Func::expandCommonVariables($text, $topic, $web);
   $text = Foswiki::Func::renderText($text);
   $text =~ s/\b(onmouseover|onmouseout|style)=".*?"//go; # TODO filter out more not validating attributes
   $text =~ s/<nop>//go;

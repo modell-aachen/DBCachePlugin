@@ -1,4 +1,4 @@
-%META:TOPICINFO{author="ProjectContributor" date="1266412704" format="1.1" version="1.3"}%
+%META:TOPICINFO{author="BaseUserMapping_999" comment="autosave" date="1356278770" format="1.1" version="4"}%
 ---+!! <nop>%TOPIC%
 %TOC%
 
@@ -399,20 +399,30 @@ This option only has an effect using speedy/perperl or fastcgi setups.
 When enabling =$$Foswiki::cfg{SecureTopicTitles}=, !TopicTitles will only be used as a link text in !WikiWords
 when the user has got view access to the target topic.
 
----++ Plugin Installation Instructions
+---++ Installation Instructions
 %$INSTALL_INSTRUCTIONS%
+
+<div class="foswikiWarningMessage">
+WARNING: before using <nop>DBCachePlugin on your site do take down your web server and run
+
+=cd <foswiki-root>/bin; ./rest /DBCachePlugin/updateCache=
+
+to generate all caches initially. Then switch on the web server again. The cache will be maintained
+automatically from there on.
+</div>
 
 ---++ Plugin Info
 <!-- 
    * Set SHORTDESCRIPTION = Lightweight frontend to the <nop>DBCacheContrib
 -->
 |  Author: | Michael Daum |
-|  Copyright &copy;: | 2005-2012, Michael Daum http://michaeldaumconsulting.com |
+|  Copyright &copy;: | 2005-2013, Michael Daum http://michaeldaumconsulting.com |
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
-   29 Nov 2012: | topic title of webhomes now defaults to the web name instead of the topic name |
+|  07 Jan 2013: | a lot of performance improvements |
+|  29 Nov 2012: | topic title of webhomes now defaults to the web name instead of the topic name |
 |  19 Nov 2012: | improved save performance on large webs |
 |  01 Oct 2012: | handle bad date formfields more gracefully |
 |  11 Jan 2012: | implemented !TopicTitles protected by access control rights |

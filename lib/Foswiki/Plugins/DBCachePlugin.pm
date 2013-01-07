@@ -1,6 +1,6 @@
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
-# Copyright (C) 2005-2012 Michael Daum http://michaeldaumconsulting.com
+# Copyright (C) 2005-2013 Michael Daum http://michaeldaumconsulting.com
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,8 +22,8 @@ use warnings;
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::Core');
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::WebDB');
 
-our $VERSION = '4.30';
-our $RELEASE = '4.30';
+our $VERSION = '5.00';
+our $RELEASE = '5.00';
 our $NO_PREFS_IN_TOPIC = 1;
 our $SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 
@@ -89,7 +89,7 @@ sub initPlugin {
     return Foswiki::Plugins::DBCachePlugin::Core::handleTOPICTITLE(@_);
   });
 
-  Foswiki::Func::registerRESTHandler('UpdateCache', \&restUpdateCache);
+  Foswiki::Func::registerRESTHandler('updateCache', \&restUpdateCache);
 
   Foswiki::Func::registerRESTHandler('dbdump', sub {
     initCore();
@@ -122,13 +122,28 @@ sub initCore {
 }
 
 ###############################################################################
-# REST handler to allow offline cache updates
+# REST handler to create and update the dbcache
 sub restUpdateCache {
   my $session = shift;
-  my $web = $session->{webName};
 
-  my $db = getDB($web);
-  $db->load(1) if $db;
+  my $query = Foswiki::Func::getRequestObject();
+
+  my $theWeb = $query->param('web');
+  my @webs;
+
+  if ($theWeb) {
+    push @webs,$theWeb;
+  } else {
+    @webs = Foswiki::Func::getListOfWebs();
+  }
+
+  foreach my $web (sort @webs) {
+    print STDERR "### upating $web\n";
+    my $db = getDB($web);
+    $db->load(1) if $db;
+  }
+
+  return "### done\n\n";
 }
 
 ###############################################################################
@@ -234,6 +249,11 @@ sub renderWikiWordHandler {
 sub getDB {
   initCore();
   return Foswiki::Plugins::DBCachePlugin::Core::getDB(@_);
+}
+
+sub unloadDB {
+  initCore();
+  return Foswiki::Plugins::DBCachePlugin::Core::unloadDB(@_);
 }
 
 sub getTopicTitle {
