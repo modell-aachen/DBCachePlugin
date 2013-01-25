@@ -194,7 +194,6 @@ sub onReload {
         $commentDate = $cmtDate;
       }
       $cmt->set('_up', $topic);
-#      $cmt->set('_web', $this->{_cache});
       $cmts = $topic->get('comments');
       if (!defined($cmts)) {
         $cmts = $archivist->newArray();

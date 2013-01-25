@@ -165,7 +165,7 @@ sub handleNeighbours {
   #writeDebug('theSearch='. $theSearch) if $theSearch;
 
   
-  my $db = Foswiki::Plugins::DBCachePlugin::getDB($theWeb);
+  my $db = getDB($theWeb);
   return inlineError("ERROR: DBPREV/DBNEXT unknown web $theWeb") unless $db;
 
   my ($prevTopic, $nextTopic) = $db->getNeighbourTopics($theTopic, $theSearch, $theOrder, $theReverse);
@@ -1121,26 +1121,40 @@ sub getDB {
   my $isModified = 1;
 
   unless (defined $db) {
-    my $impl = Foswiki::Func::getPreferencesValue('WEBDB', $theWeb)
-      || 'Foswiki::Plugins::DBCachePlugin::WebDB';
-    $impl =~ s/^\s+//go;
-    $impl =~ s/\s+$//go;
-
-    writeDebug("loading new webdb for '$theWeb'");
-    $db = $webDB{$webKey} = new $impl($theWeb);
-
+    $db = $webDB{$webKey} = newDB($theWeb);
   } else {
     $isModified = $webDBIsModified{$webKey};
     unless (defined $isModified) {
       $isModified = $webDBIsModified{$webKey} = $db->getArchivist->isModified();
+      writeDebug("reading from archivist isModified=$isModified");
+    } else {
+      #writeDebug("already got isModified=$isModified");
+    }
+    if ($isModified) {
+      $db = $webDB{$webKey} = newDB($theWeb);
     }
   }
 
   if ($isModified || $refresh) {
+    writeDebug("need to load again");
     $db->load($doRefresh, $baseWeb, $baseTopic);
+    $webDBIsModified{$webKey} = 0;
   }
 
   return $db;
+}
+
+###############################################################################
+sub newDB {
+  my $web = shift;
+
+  my $impl = Foswiki::Func::getPreferencesValue('WEBDB', $web)
+      || 'Foswiki::Plugins::DBCachePlugin::WebDB';
+  $impl =~ s/^\s+//go;
+  $impl =~ s/\s+$//go;
+
+  writeDebug("loading new webdb for '$web'");
+  return new $impl($web);
 }
 
 ###############################################################################

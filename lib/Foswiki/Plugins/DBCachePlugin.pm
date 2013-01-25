@@ -22,8 +22,8 @@ use warnings;
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::Core');
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::WebDB');
 
-our $VERSION = '5.00';
-our $RELEASE = '5.00';
+our $VERSION = '5.01';
+our $RELEASE = '5.01';
 our $NO_PREFS_IN_TOPIC = 1;
 our $SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 
@@ -138,9 +138,13 @@ sub restUpdateCache {
   }
 
   foreach my $web (sort @webs) {
-    print STDERR "### upating $web\n";
     my $db = getDB($web);
-    $db->load(1) if $db;
+    if ($db) {
+      #print STDERR "### upating $web\n";
+      $db->load(1);
+    } else {
+      #print STDERR "WARNING: illegal web $web\n";
+    }
   }
 
   return "### done\n\n";
