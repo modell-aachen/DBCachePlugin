@@ -421,6 +421,7 @@ automatically from there on.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  14 Mar 2013: | make preferences searchable by caching them into a map instead of an array |
 |  25 Jan 2013: | fixed loading cache from disk again on a change |
 |  07 Jan 2013: | a lot of performance improvements |
 |  29 Nov 2012: | topic title of webhomes now defaults to the web name instead of the topic name |

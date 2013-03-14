@@ -133,7 +133,7 @@ sub onReload {
     my $topicTitle = $this->getPreference($topic, 'TOPICTITLE');
 
     # 2. get from form
-    unless (defined $topicTitle) {
+    unless (defined $topicTitle && $topicTitle ne '') {
       my $form = $topic->fastget('form');
       if ($form) {
 
@@ -326,8 +326,8 @@ sub dbQuery {
       unless ($isAdmin) {
         my $prefs = $topicObj->fastget('preferences');
         if (defined($prefs)) {
-          foreach my $val ($prefs->getValues()) {
-            if ($val->fastget('name') =~ /^(ALLOW|DENY)TOPIC/) {
+          foreach my $key ($prefs->getKeys()) {
+            if ($key =~ /^(ALLOW|DENY)TOPIC/) {
               $topicHasPerms = 1;
               last;
             }
@@ -596,17 +596,11 @@ sub getPreference {
 
   return unless defined $prefs;
 
-  my $value;
-  foreach my $pref ($prefs->getValues()) {
-    my $name = $pref->fastget('name');
-    if ($name eq $key) {
-      $value = $pref->fastget('value');
-      $value = urlDecode($value);
-      last;
-    }
-  }
+  my $value = $prefs->fastget($key);
 
-  return $value;
+  return unless defined $value;
+
+  return urlDecode($value);
 }
 
 ###############################################################################

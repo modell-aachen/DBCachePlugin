@@ -896,11 +896,11 @@ sub dbDump {
   if ($prefs) {
     $result .= "<p/>\n---++ Preferences = $prefs\n";
     $result .= "<table class='foswikiTable'>\n";
-    $result .= '<tr><th>type</th><th>name</th><th>value</th></tr>'."\n";
-    foreach my $pref (sort {$a->fastget('name') cmp $b->fastget('name')} $prefs->getValues()) {
-      $result .= "<tr><td>".$pref->fastget('type')."</td>\n";
-      $result .= "<td>".$pref->fastget('name')."</td>\n";
-      $result .= "<td>".$pref->fastget('value')."</td>\n";
+    $result .= '<tr><th>name</th><th>value</th></tr>'."\n";
+    foreach my $key (sort $prefs->getKeys()) {
+      my $value = $prefs->fastget($key);
+      $result .= "<tr><td>$key</td>\n";
+      $result .= "<td>$value</td>\n";
       $result .= "</tr>\n";
     }
     $result .= "</table>\n";
