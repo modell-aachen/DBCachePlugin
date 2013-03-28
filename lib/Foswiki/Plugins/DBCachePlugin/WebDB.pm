@@ -320,7 +320,7 @@ sub dbQuery {
     my $topicObj = $this->fastget($topicName);
     next unless $topicObj;    # never
 
-    if (!$search || $search->matches($topicObj)) {
+    if (!$search || $search->matches($topicObj, {webDB=>$this})) {
 
       my $topicHasPerms = 0;
       unless ($isAdmin) {

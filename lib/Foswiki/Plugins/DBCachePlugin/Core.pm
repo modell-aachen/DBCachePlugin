@@ -331,7 +331,7 @@ sub handleDBQUERY {
       next if $index <= $theSkip;
       my $topicObj = $hits->{$topicName};
       my $line = $theFormat;
-      $line =~ s/\$pattern\((.*?)\)/extractPattern($topicObj, $1)/geo;
+      $line =~ s/\$pattern\((.*?)\)/extractPattern($topicObj, $1)/ge;
       $line =~ s/\$formfield\((.*?)\)/
         my $temp = $theDB->getFormField($topicName, $1);
 	$temp =~ s#\)#${TranslationToken}#g;
@@ -341,11 +341,14 @@ sub handleDBQUERY {
         $temp = $theDB->expandPath($topicObj, $temp);
 	$temp =~ s#\)#${TranslationToken}#g;
 	$temp/geo;
-      $line =~ s/\$d2n\((.*?)\)/parseTime($theDB->expandPath($topicObj, $1))/geo;
-      $line =~ s/\$formatTime\((.*?)(?:,\s*'([^']*?)')?\)/formatTime($theDB->expandPath($topicObj, $1), $2)/geo; # single quoted
+      $line =~ s/\$d2n\((.*?)\)/parseTime($theDB->expandPath($topicObj, $1))/ge;
+      $line =~ s/\$formatTime\((.*?)(?:,\s*'([^']*?)')?\)/formatTime($theDB->expandPath($topicObj, $1), $2)/ge; # single quoted
       $line =~ s/\$topic/$topicName/g;
       $line =~ s/\$web/$thisWeb/g;
       $line =~ s/\$index/$index/g;
+      $line =~ s/\$flatten\((.*?)\)/flatten($1, $thisWeb, $thisTopic)/ges;
+      $line =~ s/\$rss\((.*?)\)/rss($1, $thisWeb, $thisTopic)/ges;
+
       $line =~ s/${TranslationToken}/)/go;
       push @result, $line;
 
@@ -1238,9 +1241,6 @@ sub expandVariables {
   while (my ($key, $val) =  each %params) {
     $text =~ s/\$$key\b/$val/g if defined $val;
   }
-
-  $text =~ s/\$flatten\((.*?)\)/flatten($1, $web, $topic)/ges;
-  $text =~ s/\$rss\((.*?)\)/rss($1, $web, $topic)/ges;
 
   return $text;
 }
