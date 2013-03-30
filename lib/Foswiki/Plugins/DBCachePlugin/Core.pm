@@ -978,9 +978,9 @@ sub handleDBRECURSE {
   return '' if $params->{hidenull} eq 'on' && $params->{_count} == 0;
 
   my $text = expandVariables(
-      ($params->{_count} == 1)?$params->{singleheader}:$params->{header}.
+      (($params->{_count} == 1)?$params->{singleheader}:$params->{header}).
       join($params->{separator},@$result).
-      ($params->{_count} == 1)?$params->{singlefooter}:$params->{footer}, 
+      (($params->{_count} == 1)?$params->{singlefooter}:$params->{footer}), 
       $thisWeb, $thisTopic, 
       count=>$params->{_count});
 

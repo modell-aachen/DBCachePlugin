@@ -421,6 +421,7 @@ automatically from there on.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  30 Mar 2013: | fixed formatting results in DBRECURSE |
 |  28 Mar 2013: | fixed op_ref in search queries; fixed $flatten() |
 |  14 Mar 2013: | make preferences searchable by caching them into a map instead of an array |
 |  25 Jan 2013: | fixed loading cache from disk again on a change |
