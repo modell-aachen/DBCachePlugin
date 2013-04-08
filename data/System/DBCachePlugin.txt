@@ -121,11 +121,11 @@ Following variables are expanded in format strings:
      (see [[%SYSTEMWEB%.Macros#DISPLAYTIME_format_formatted_dis][Macros]] documentation).
    * $expand(&lt;formfield-accessor>): return the formfield pointed to by the 
       &lt;formfield-accessor>
+   * $d2n(&lt;formfield-accessor>): converts a date formfield's value to epoch seconds
    * $rss(...): encode entities so that the text can be included in an rss feed
    * $encode(...): encode entities so that the text can be included in HTML input form elements
    * $flatten(...): remove any special markup producing a flattened text representation
    * $trunc(...,length): truncate a string to the given length
-   * $d2n(...): converts a date string to epoch seconds
    * $uc(...): converts a string to upper case
    * $lc(...): converts a string to lower case
 
@@ -421,6 +421,8 @@ automatically from there on.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  08 Apr 2013: | implemented $lc and $uc as documented; \
+                  fixed default !TopicTitle for a !WebHome being the web name with parent webs stripped off |
 |  30 Mar 2013: | fixed formatting results in DBRECURSE |
 |  28 Mar 2013: | fixed op_ref in search queries; fixed $flatten() |
 |  14 Mar 2013: | make preferences searchable by caching them into a map instead of an array |

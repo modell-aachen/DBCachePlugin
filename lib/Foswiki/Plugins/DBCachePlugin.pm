@@ -17,13 +17,16 @@ package Foswiki::Plugins::DBCachePlugin;
 use strict;
 use warnings;
 
+use Foswiki::Func();
+use Foswiki::Plugins();
+
 #use Monitor;
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin');
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::Core');
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::WebDB');
 
-our $VERSION = '5.21';
-our $RELEASE = '5.21';
+our $VERSION = '5.30';
+our $RELEASE = '5.30';
 our $NO_PREFS_IN_TOPIC = 1;
 our $SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 
@@ -38,11 +41,6 @@ our $isEnabledRenameHandler;
 # plugin initializer
 sub initPlugin {
   ($baseTopic, $baseWeb) = @_;
-
-  # check for Plugins.pm versions
-  #  if ($Foswiki::Plugins::VERSION < 1.1) {
-  #    return 0;
-  #  }
 
   Foswiki::Func::registerTagHandler('DBQUERY', sub {
     initCore();

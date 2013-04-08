@@ -174,6 +174,7 @@ sub onReload {
       #print STDERR "defaulting to topic name\n";
       if ($topicName eq 'WebHome') {
         $topicTitle = $this->{web};
+        $topicTitle =~ s/^.*[\.\/]//;
       } else {
         $topicTitle = $topicName;
       }

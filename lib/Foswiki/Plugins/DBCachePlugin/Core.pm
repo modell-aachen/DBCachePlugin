@@ -40,6 +40,7 @@ use Foswiki::Contrib::DBCacheContrib::Search ();
 use Foswiki::Plugins::DBCachePlugin::WebDB ();
 use Foswiki::Sandbox ();
 use Foswiki::Time ();
+use Foswiki::Func ();
 use Cwd;
 
 ###############################################################################
@@ -241,7 +242,11 @@ sub getTopicTitle {
 
   my $topicTitle = $topicObj->fastget('topictitle');
   return $topicTitle if $topicTitle;
-  return $theWeb if $theTopic eq 'WebHome';
+
+  if ($theTopic eq $Foswiki::cfg{HomeTopicName}) {
+    $theWeb =~ s/^.*[\.\/]//;
+    return $theWeb;
+  }
 
   return $theTopic;
 }
@@ -1227,6 +1232,8 @@ sub expandFormatTokens {
   $text =~ s/\$n/\n/go;
   $text =~ s/\$encode\((.*?)\)/entityEncode($1)/ges;
   $text =~ s/\$trunc\((.*?),\s*(\d+)\)/substr($1,0,$2)/ges;
+  $text =~ s/\$lc\((.*?)\)/lc($1)/ge;
+  $text =~ s/\$uc\((.*?)\)/uc($1)/ge;
   $text =~ s/\$dollar/\$/go;
 
   return $text;
