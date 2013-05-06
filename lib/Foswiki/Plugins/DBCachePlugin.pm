@@ -25,8 +25,8 @@ use Foswiki::Plugins();
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::Core');
 #Monitor::MonitorMethod('Foswiki::Contrib::DBCachePlugin::WebDB');
 
-our $VERSION = '5.30';
-our $RELEASE = '5.30';
+our $VERSION = '5.31';
+our $RELEASE = '5.31';
 our $NO_PREFS_IN_TOPIC = 1;
 our $SHORTDESCRIPTION = 'Lightweighted frontend to the DBCacheContrib';
 
@@ -136,13 +136,7 @@ sub restUpdateCache {
   }
 
   foreach my $web (sort @webs) {
-    my $db = getDB($web);
-    if ($db) {
-      print STDERR "### upating $web\n";
-      $db->load(1);
-    } else {
-      print STDERR "WARNING: illegal web $web\n";
-    }
+    getDB($web, 2);
   }
 
   return "### done\n\n";

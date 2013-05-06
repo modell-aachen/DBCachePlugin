@@ -1118,7 +1118,9 @@ sub getWebKey {
 sub getDB {
   my ($theWeb, $refresh) = @_;
 
-  #writeDebug("called getDB($theWeb)");
+  $refresh = $doRefresh unless defined $refresh;
+
+  #writeDebug("called getDB($theWeb, $refresh)");
 
   my $webKey = getWebKey($theWeb);
   return unless defined $webKey; # invalid webname
@@ -1134,7 +1136,7 @@ sub getDB {
     $isModified = $webDBIsModified{$webKey};
     unless (defined $isModified) {
       $isModified = $webDBIsModified{$webKey} = $db->getArchivist->isModified();
-      writeDebug("reading from archivist isModified=$isModified");
+      #writeDebug("reading from archivist isModified=$isModified");
     } else {
       #writeDebug("already got isModified=$isModified");
     }
@@ -1144,8 +1146,8 @@ sub getDB {
   }
 
   if ($isModified || $refresh) {
-    writeDebug("need to load again");
-    $db->load($doRefresh, $baseWeb, $baseTopic);
+    #writeDebug("need to load again");
+    $db->load($refresh, $baseWeb, $baseTopic);
     $webDBIsModified{$webKey} = 0;
   }
 
