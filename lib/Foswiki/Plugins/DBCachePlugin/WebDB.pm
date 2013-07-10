@@ -194,7 +194,6 @@ sub onReload {
       if ($cmtDate > $commentDate) {
         $commentDate = $cmtDate;
       }
-      $cmt->set('_up', $topic);
       $cmts = $topic->get('comments');
       if (!defined($cmts)) {
         $cmts = $archivist->newArray();
@@ -403,8 +402,8 @@ sub expandPath {
   my ($this, $theRoot, $thePath) = @_;
 
   return '' if !defined($thePath) || !defined($theRoot);
-  $thePath =~ s/^\.//o;
-  $thePath =~ s/\[([^\]]+)\]/$1/o;
+#  $thePath =~ s/^\.//o;
+#  $thePath =~ s/\[([^\]]+)\]/$1/o;
 
   #print STDERR "DEBUG: expandPath($theRoot, $thePath)\n";
 
@@ -439,11 +438,11 @@ sub expandPath {
   }
   if ($thePath =~ /^'([^']*)'$/) {
 
-    #print STDERR "DEBUG: result=$1\n";
+    #print STDERR "DEBUG: here1 - result=$1\n";
     return $1;
   }
   if ($thePath =~ /^[+-]?\d+(\.\d+)?$/) {
-    #print STDERR "DEBUG: result=$thePath\n";
+    #print STDERR "DEBUG: here2 - result=$thePath\n";
     return $thePath;
   }
   if ($thePath =~ /^(.*?) or (.*)$/) {
@@ -465,8 +464,8 @@ sub expandPath {
     return '' unless defined $root;
     return $root if $first eq 'text';    # not url encoded
     my $field = urlDecode($root);
-
-    #print STDERR "DEBUG: result=$field\n";
+ 
+    #print STDERR "DEBUG: here3 - result=$field\n";
     return $field;
   }
 
@@ -495,8 +494,17 @@ sub expandPath {
     return $this->expandPath($theRoot, $thePath);
   }
 
-  #print STDERR "DEBUG: result is empty\n";
-  return '';
+  #print STDERR "DEBUG: $theRoot->get($thePath)\n";
+
+  my $result = $theRoot->get($thePath);
+  $result = '' unless defined $result;
+
+  if (ref($result) && UNIVERSAL::can($result, "size")) {
+    $result = $result->size();
+  }
+  #print STDERR "DEBUG: result=$result\n";
+
+  return $result;
 }
 
 ###############################################################################

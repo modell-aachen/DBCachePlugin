@@ -837,6 +837,97 @@ sub restDBDUMP {
 }
 
 ###############################################################################
+sub _dbDump {
+  my $obj = shift;
+
+  return "undef" unless defined $obj;
+
+  if (ref($obj)) {
+    if (ref($obj) eq 'ARRAY') {
+      return join(", ", sort @$obj);
+    } elsif (ref($obj) eq 'HASH') {
+      return _dbDumpHash($obj);
+    } elsif ($obj->isa("Foswiki::Contrib::DBCacheContrib::Map")) {
+      return _dbDumpMap($obj);
+    } elsif ($obj->isa("Foswiki::Contrib::DBCacheContrib::Array")) {
+      return _dbDumpArray($obj);
+    } 
+  } 
+
+  return "<verbatim style='margin:0'>\n$obj\n</verbatim>";
+}
+
+###############################################################################
+sub _dbDumpList {
+  my $list = shift;
+
+  my @result = ();
+
+  foreach my $item (@$list) {
+    push @result, _dbDump($item);
+  }
+
+  return join(", ", @result);
+}
+
+
+###############################################################################
+sub _dbDumpHash {
+  my $hash = shift;
+
+  my $result = "<table class='foswikiTable' style='margin:0;font-size:1em'>\n";
+
+  foreach my $key (sort keys %$hash) {
+    $result .= "<tr><th valign='top'>$key</th><td>\n";
+    $result .= _dbDump($hash->{$key});
+    $result .= "</td></tr>\n";
+  }
+
+  return $result."</table>\n";
+}
+
+###############################################################################
+sub _dbDumpArray {
+  my $array = shift;
+
+  my $result = "<table class='foswikiTable' style='margin:0;font-size:1em'>\n";
+
+  my $index = 0;
+  foreach my $obj (sort $array->getValues()) {
+    $result .= "<tr><th valign='top'>";
+    if (UNIVERSAL::can($obj, "fastget")) {
+      $result .= $obj->fastget('name');
+    } else {
+      $result .= $index;
+    }
+    $result .= "</th><td>\n";
+    $result .= _dbDump($obj);
+    $result .= "</td></tr>\n";
+    $index++;
+  }
+
+  return $result."</table>\n";
+}
+
+###############################################################################
+sub _dbDumpMap {
+  my $map = shift;
+
+  my $result = "<table class='foswikiTable' style='margin:0;font-size:1em'>\n";
+
+  my @keys = sort {lc($a) cmp lc($b)} $map->getKeys();
+
+  foreach my $key (@keys) {
+    $result .= "<tr><th valign='top'>$key</th><td>\n";
+    $result .= _dbDump($map->fastget($key));
+    $result .= "</td></tr>\n";
+  }
+
+  return $result."</table>\n";
+}
+
+
+###############################################################################
 sub dbDump {
   my ($web, $topic) = @_;
 
@@ -847,91 +938,8 @@ sub dbDump {
     return inlineError("DBCachePlugin: $web.$topic not found");
   }
   my $result = "\n<noautolink>\n";
-  $result .= "---++ [[$web.$topic]]\n$topicObj\n";
-
-  # read all keys
-  $result .= "<table class='foswikiTable'>\n";
-  foreach my $key (sort $topicObj->getKeys()) {
-    my $value = $topicObj->fastget($key);
-    $value = 'undef' unless defined $value;
-    $result .= "<tr><th>$key</th>\n<td><verbatim>\n$value\n</verbatim></td></tr>\n";
-  }
-  $result .= "</table>\n";
-
-  # read info
-  my $topicInfo = $topicObj->fastget('info');
-  $result .= "<p/>\n---++ Info = $topicInfo\n";
-  $result .= "<table class='foswikiTable'>\n";
-  foreach my $key (sort $topicInfo->getKeys()) {
-    my $value = $topicInfo->fastget($key);
-    $result .= "<tr><th>$key</th><td>$value</td></tr>\n" if defined $value;
-  }
-  $result .= "</table>\n";
-
-  # read form
-  my $topicForm = $topicObj->fastget('form');
-  if ($topicForm) {
-    $result .= "<p/>\n---++ Form = $topicForm\n";
-    $result .= "<table class='foswikiTable'>\n";
-    $topicForm = $topicObj->fastget($topicForm);
-    foreach my $key (sort $topicForm->getKeys()) {
-      my $value = $topicForm->fastget($key);
-      $result .= "<tr><th>$key</th><td>$value</td>\n" if defined $value;
-    }
-    $result .= "</table>\n";
-  }
-
-  # read attachments
-  my $attachments = $topicObj->fastget('attachments');
-  if ($attachments) {
-    $result .= "<p/>\n---++ Attachments = $attachments\n";
-    $result .= "<table class='foswikiTable'>\n";
-    foreach my $attachment (sort $attachments->getValues()) {
-      $result .= "<tr><th valign='top'>".$attachment->fastget('name')."</th>";
-      $result .= '<td><table>';
-      foreach my $key (sort $attachment->getKeys()) {
-        next if $key eq 'name';
-        my $value = $attachment->fastget($key);
-        $result .= "<tr><th>$key</th><td>$value</td></tr>\n" if defined $value;
-      }
-      $result .= '</table></td></tr>';
-    }
-    $result .= "</table>\n";
-  }
-
-  # read preferences
-  my $prefs = $topicObj->fastget('preferences');
-  if ($prefs) {
-    $result .= "<p/>\n---++ Preferences = $prefs\n";
-    $result .= "<table class='foswikiTable'>\n";
-    $result .= '<tr><th>name</th><th>value</th></tr>'."\n";
-    foreach my $key (sort $prefs->getKeys()) {
-      my $value = $prefs->fastget($key);
-      $result .= "<tr><td>$key</td>\n";
-      $result .= "<td>$value</td>\n";
-      $result .= "</tr>\n";
-    }
-    $result .= "</table>\n";
-  }
-
-  # read comments
-  my $comments = $topicObj->fastget('comments');
-  if ($comments) {
-    $result .= "<p/>\n---++ Comments = $comments\n";
-    $result .= "<table class='foswikiTable'>\n";
-    foreach my $comment (sort $comments->getValues()) {
-      $result .= "<tr><th valign='top'>".$comment->fastget('name')."</th>";
-      $result .= '<td><table>';
-      foreach my $key (sort $comment->getKeys()) {
-        next if $key eq 'name';
-        my $value = $comment->fastget($key);
-        $result .= "<tr><th>$key</th><td>$value</td></tr>\n" if defined $value;
-      }
-      $result .= '</table></td>';
-    }
-    $result .= "</tr></table>\n";
-  }
-
+  $result .= "---++ [[$web.$topic]]\n";
+  $result .= _dbDumpMap($topicObj);
   return $result."\n</noautolink>\n";
 }
 

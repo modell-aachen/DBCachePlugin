@@ -421,6 +421,8 @@ automatically from there on.
 |  Release: | %$RELEASE% |
 |  Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  10 Jul 2013: | fixed querying non-standard %META data; \
+                  improved %DBDUMP to show non-standard %META data |
 |  06 May 2013: | fixed =updateCache= rest handler to pick up changes on the filesystem reliably |
 |  08 Apr 2013: | implemented $lc and $uc as documented; \
                   fixed default !TopicTitle for a !WebHome being the web name with parent webs stripped off |
