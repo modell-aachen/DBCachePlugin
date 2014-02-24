@@ -115,6 +115,9 @@ sub afterSaveHandler {
   $newWeb ||= $baseWeb;
   $newTopic ||= $baseTopic;
   #%WEBDAVREPLACEc8f51c3c4bb229cc4e1c7a7dcb07cec0%#
+  
+  return unless ( $newWeb && $newTopic );
+  
   my $db = getDB($web);
   $db->loadTopic($web, $topic);
 
