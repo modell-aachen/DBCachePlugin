@@ -940,6 +940,9 @@ sub dbDump {
   unless ($topicObj) {
     return inlineError("DBCachePlugin: $web.$topic not found");
   }
+  unless (Foswiki::Func::checkAccessPermission('VIEW', undef, undef, $topic, $web)) {
+    return inlineError("DBCachePlugin: access to $web.$topic denied");
+  }
   my $result = "\n<noautolink>\n";
   $result .= "---++ [[$web.$topic]]\n";
   $result .= _dbDumpMap($topicObj);
