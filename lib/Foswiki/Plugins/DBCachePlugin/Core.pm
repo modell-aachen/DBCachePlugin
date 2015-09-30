@@ -110,34 +110,28 @@ sub renderWikiWordHandler {
 sub afterSaveHandler {
   my ($web, $topic, $newWeb, $newTopic, $attachment, $newAttachment) = @_;
 
-  #writeDebug("called afterSaveHandler($web, $topic, $newWeb, $newTopic, ..., ...)");
+  $newWeb ||= $web;
+  $newTopic ||= $topic;
 
-  $newWeb ||= $baseWeb;
-  $newTopic ||= $baseTopic;
-  #%WEBDAVREPLACEc8f51c3c4bb229cc4e1c7a7dcb07cec0%#
-  
-  return unless ( $newWeb && $newTopic );
-  
-  my $db = getDB($web);
-  $db->loadTopic($web, $topic);
-
-  # move/rename 
-  if ($newWeb eq $web) {
-    if ($topic ne $newTopic) {
-      $db->loadTopic($web, $newTopic)
+  my ($lWeb, $lTopic) = ($web, $topic);
+  my $db;
+  if ($newWeb ne $web) { # Web did change
+    $db = getDB($newWeb);
+    $lWeb = $newWeb;
+  } else { # Web did not change
+    $db = getDB($newWeb);
+    if ($topic ne $newTopic ) { # but topic did
+      $lTopic = $newTopic;
     }
-  } else { # crossing webs
-    $db = getDB($newWeb); 
-    $db->loadTopic($newWeb, $topic);
-    if ($topic ne $newTopic) {
-      $db->loadTopic($newWeb, $newTopic)
-    }
-
   }
 
-  # set the internal loadTime counter to the latest modification
-  # time on disk.
-  $db->getArchivist->updateCacheTime();
+  if ($db) {
+    $db->loadTopic($lWeb, $lTopic);
+
+    # Set the internal loadTime counter to the latest modification
+    # time on disk.
+    $db->getArchivist->updateCacheTime();
+  }
 }
 
 ###############################################################################
