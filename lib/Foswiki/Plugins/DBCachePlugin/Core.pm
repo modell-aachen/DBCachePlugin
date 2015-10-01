@@ -113,25 +113,25 @@ sub afterSaveHandler {
   $newWeb ||= $web;
   $newTopic ||= $topic;
 
-  my ($lWeb, $lTopic) = ($web, $topic);
-  my $db;
-  if ($newWeb ne $web) { # Web did change
-    $db = getDB($newWeb);
-    $lWeb = $newWeb;
-  } else { # Web did not change
-    $db = getDB($newWeb);
-    if ($topic ne $newTopic ) { # but topic did
-      $lTopic = $newTopic;
+  my $db = getDB($web);
+  unless ($db) {
+    print STDERR "WARNING: DBCachePlugin can't get cache for web '$web'\n";
+    return;
+  }
+  $db->loadTopic($web, $topic);
+
+  if ($newWeb ne $web || $newTopic ne $topic) { # Move/rename
+    $db = getDB($newWeb) if $newWeb ne $web;
+    unless ($db) {
+      print STDERR "WARNING: DBCachePlugin can't get cache for web '$newWeb'\n";
+      return;
     }
+    $db->loadTopic($newWeb, $newTopic);
   }
 
-  if ($db) {
-    $db->loadTopic($lWeb, $lTopic);
-
-    # Set the internal loadTime counter to the latest modification
-    # time on disk.
-    $db->getArchivist->updateCacheTime();
-  }
+  # Set the internal loadTime counter to the latest modification
+  # time on disk.
+  $db->getArchivist->updateCacheTime();
 }
 
 ###############################################################################
