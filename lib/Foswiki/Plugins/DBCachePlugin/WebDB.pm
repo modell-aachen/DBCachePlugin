@@ -120,7 +120,7 @@ sub onReload {
     # CAUTION: %SECTION will be deleted in the near future.
     # so please convert all %SECTION to %STARTSECTION
 
-    while ($text =~ s/%(?:START)?SECTION{(.*?)}%(.*?)%ENDSECTION{[^}]*?"(.*?)"}%//s) {
+    while ($text =~ s/%(?:START)?SECTION\{(.*?)\}%(.*?)%ENDSECTION\{[^}]*?"(.*?)"\}%//s) {
       my $attrs = new Foswiki::Attrs($1);
       my $name = $attrs->{name} || $attrs->{_DEFAULT} || '';
       my $sectionText = $2;
