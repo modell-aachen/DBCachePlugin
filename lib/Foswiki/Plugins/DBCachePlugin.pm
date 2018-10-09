@@ -127,10 +127,17 @@ sub restUpdateCache {
   my $query = Foswiki::Func::getRequestObject();
 
   my $theWeb = $query->param('web');
+  updateCache($theWeb);
+
+  return "### done\n\n";
+}
+
+sub updateCache {
+  my ($web) = @_;
   my @webs;
 
-  if ($theWeb) {
-    push @webs,$theWeb;
+  if ($web) {
+    push @webs,$web;
   } else {
     @webs = Foswiki::Func::getListOfWebs();
   }
@@ -138,8 +145,6 @@ sub restUpdateCache {
   foreach my $web (sort @webs) {
     getDB($web, 2);
   }
-
-  return "### done\n\n";
 }
 
 ###############################################################################
@@ -201,7 +206,7 @@ sub afterAttachmentSaveHandler {
   #my ($attrHashRef, $topic, $web) = @_;
   return unless $isEnabledSaveHandler;
 
-  return if $Foswiki::Plugins::VERSION >= 2.1 || 
+  return if $Foswiki::Plugins::VERSION >= 2.1 ||
     $Foswiki::cfg{DBCachePlugin}{UseUploadHandler}; # set this to true if you backported the afterUploadHandler
 
   initCore();
