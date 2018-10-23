@@ -198,6 +198,8 @@ sub handleTOPICTITLE {
   my $theEncoding = $params->{encode} || '';
   my $theDefault = $params->{default};
   my $theHideAutoInc = Foswiki::Func::isTrue($params->{hideautoinc}, 0);
+  my $request = Foswiki::Func::getRequestObject();
+  my $rev = $request->param("rev");
 
   $thisTopic =~ s/^\s+//go;
   $thisTopic =~ s/\s+$//go;
@@ -205,6 +207,10 @@ sub handleTOPICTITLE {
   ($thisWeb, $thisTopic) =
     Foswiki::Func::normalizeWebTopicName($thisWeb, $thisTopic);
 
+  if($rev) {
+        my $meta = Foswiki::Meta->load($session, $thisWeb, $thisTopic, $rev);
+        return $meta->get( 'FIELD', 'TopicTitle')->{value};
+  }
   my $topicTitle = getTopicTitle($thisWeb, $thisTopic);
 
   if ($topicTitle eq $thisTopic && defined($theDefault)) {
