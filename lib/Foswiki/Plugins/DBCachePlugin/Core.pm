@@ -207,11 +207,14 @@ sub handleTOPICTITLE {
   ($thisWeb, $thisTopic) =
     Foswiki::Func::normalizeWebTopicName($thisWeb, $thisTopic);
 
+  my $topicTitle;
   if($rev) {
         my $meta = Foswiki::Meta->load($session, $thisWeb, $thisTopic, $rev);
-        return $meta->get( 'FIELD', 'TopicTitle')->{value};
+        if($meta->get( 'FIELD', 'TopicTitle')) {
+            $topicTitle = $meta->get( 'FIELD', 'TopicTitle')->{value};
+        }
   }
-  my $topicTitle = getTopicTitle($thisWeb, $thisTopic);
+  $topicTitle = getTopicTitle($thisWeb, $thisTopic) unless $topicTitle;
 
   if ($topicTitle eq $thisTopic && defined($theDefault)) {
     $topicTitle = $theDefault;
