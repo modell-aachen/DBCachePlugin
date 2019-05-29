@@ -195,7 +195,7 @@ sub handleTOPICTITLE {
 
   my $thisTopic = $params->{_DEFAULT} || $params->{topic} || $baseTopic;
   my $thisWeb = $params->{web} || $baseWeb;
-  my $theEncoding = $params->{encode} || '';
+  my $theEncoding = $params->{encode} || 'entity';
   my $theDefault = $params->{default};
   my $theHideAutoInc = Foswiki::Func::isTrue($params->{hideautoinc}, 0);
   my $request = Foswiki::Func::getRequestObject();
