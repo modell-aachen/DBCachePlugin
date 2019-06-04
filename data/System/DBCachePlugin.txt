@@ -382,7 +382,7 @@ Access the formfield value of an arbitrary topic.
 
 returns the value of the named formfield 
 
-<!-- %RED%TODO: document the rest of the methods %ENDCOLOR% -->
+<!-- %RED{encode="none"}%TODO: document the rest of the methods %ENDCOLOR{encode="none"}% -->
 
 ---++ Plugin Settings
 See also DBCacheContrib for additional configuration settings.
