@@ -103,7 +103,7 @@ sub renderWikiWordHandler {
 
   $theLinkText = $topicTitle if $topicTitle;
 
-  return $theLinkText;
+  return Foswiki::Func::encode($theLinkText, 'html');
 }
 
 ###############################################################################
